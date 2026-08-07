@@ -77,74 +77,76 @@ def obter_estatisticas_time_filtrado(liga_id, season, team_id, contexto):
     except:
         return dados_padrao
 
-@st.cache_data(ttl=600)
-def buscar_jogos_e_projetar(ligas_ids):
+@st.cache_data(ttl=300)
+def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     jogos = []
     log = []
     
-    # SUPER BUSCA: Procura jogos de Hoje E de Amanhã para evitar problemas de fuso horário
-    data_hoje = datetime.now()
-    data_amanha = data_hoje + timedelta(days=1)
-    datas_para_buscar = [data_hoje.strftime("%Y-%m-%d"), data_amanha.strftime("%Y-%m-%d")]
-    
-    ano_atual = data_hoje.year
+    # Converte o objeto de data do Streamlit para o formato de texto da API
+    data_formatada = data_escolhida.strftime("%Y-%m-%d")
+    ano_atual = data_escolhida.year
     temporadas_para_buscar = [ano_atual, ano_atual - 1]
     
     for liga_id in ligas_ids:
-        for data_alvo in datas_para_buscar:
-            for season_temp in temporadas_para_buscar:
-                url = "https://api-sports.io"
-                params = {'league': liga_id, 'season': season_temp, 'date': data_alvo}
-                try:
-                    r = requests.get(url, headers=HEADERS, params=params)
-                    if r.status_code == 200:
-                        res_json = r.json()
-                        fixtures = res_json.get('response', [])
-                        if len(fixtures) > 0:
-                            log.append(f"Sucesso: Encontrados {len(fixtures)} jogos na Liga {liga_id} para o dia {data_alvo} (Temp {season_temp})")
+        for season_temp in temporadas_para_buscar:
+            url = "https://v3.football.api-sports.io/fixtures"
+            params = {'league': liga_id, 'season': season_temp, 'date': data_formatada}
+            try:
+                r = requests.get(url, headers=HEADERS, params=params)
+                log.append(f"Liga {liga_id} (Temp {season_temp}) - HTTP Status: {r.status_code}")
+                
+                if r.status_code == 200:
+                    res_json = r.json()
+                    
+                    # Registra no log caso a chave esteja com algum bloqueio ou limite
+                    if "errors" in res_json and res_json["errors"]:
+                        log.append(f"⚠️ Alerta da API na Liga {liga_id}: {res_json['errors']}")
+                        
+                    fixtures = res_json.get('response', [])
+                    if len(fixtures) > 0:
+                        log.append(f"✅ Sucesso: Encontrados {len(fixtures)} jogos no dia {data_formatada}")
+                        
+                        for fixture in fixtures:
+                            id_casa = fixture['teams']['home']['id']
+                            id_fora = fixture['teams']['away']['id']
+                            home_name = fixture['teams']['home']['name']
+                            away_name = fixture['teams']['away']['name']
+                            dt = datetime.fromisoformat(fixture['fixture']['date'].replace('Z',''))
                             
-                            for fixture in fixtures:
-                                id_casa = fixture['teams']['home']['id']
-                                id_fora = fixture['teams']['away']['id']
-                                home_name = fixture['teams']['home']['name']
-                                away_name = fixture['teams']['away']['name']
-                                dt = datetime.fromisoformat(fixture['fixture']['date'].replace('Z',''))
-                                
-                                stats_casa = obter_estatisticas_time_filtrado(liga_id, season_temp, id_casa, 'home')
-                                stats_fora = obter_estatisticas_time_filtrado(liga_id, season_temp, id_fora, 'away')
-                                
-                                lambda_gols_casa = (stats_casa['gols_marcados_ft'] + stats_fora['gols_sofridos_ft']) / 2
-                                lambda_gols_fora = (stats_fora['gols_marcados_ft'] + stats_casa['gols_sofridos_ft']) / 2
-                                lambda_ht_casa = (stats_casa['gols_marcados_ht'] + stats_fora['gols_sofridos_ht']) / 2
-                                lambda_ht_fora = (stats_fora['gols_marcados_ht'] + stats_casa['gols_sofridos_ht']) / 2
-                                lambda_cantos_total = stats_casa['cantos_media'] + stats_fora['cantos_media']
-                                lambda_cartoes_total = stats_casa['cartoes_media'] + stats_fora['cartoes_media']
-                                
-                                prob_over_15_ft, prob_btts = calcular_probabilidades_poisson(lambda_gols_casa, lambda_gols_fora)
-                                prob_0_0_ht = poisson.pmf(0, lambda_ht_casa + lambda_ht_fora)
-                                prob_over_05_ht = round((1 - prob_0_0_ht) * 100, 1)
-                                prob_cantos_85 = calcular_mercado_acumulado(lambda_cantos_total, 8.5)
-                                prob_cartoes_45 = calcular_mercado_acumulado(lambda_cartoes_total, 4.5)
-                                
-                                jogos.append({
-                                    "Data": dt.strftime("%d/%m"),
-                                    "Liga": LIGAS[liga_id], 
-                                    "Confronto": f"{home_name} x {away_name}", 
-                                    "Hora": dt.strftime("%H:%M"),
-                                    "0.5 HT (%)": prob_over_05_ht, 
-                                    "Odd Justa HT": calcular_odd_justa(prob_over_05_ht),
-                                    "1.5 FT (%)": prob_over_15_ft, 
-                                    "Odd Justa 1.5FT": calcular_odd_justa(prob_over_15_ft),
-                                    "BTTS Sim (%)": prob_btts, 
-                                    "Odd Justa BTTS": calcular_odd_justa(prob_btts),
-                                    "Over 8.5 Cantos (%)": prob_cantos_85, 
-                                    "Over 4.5 Cartões (%)": prob_cartoes_45
-                                })
-                            # Se achou partidas nesta temporada, não precisa buscar na temporada anterior para este mesmo dia
-                            break
-                except Exception as e:
-                    log.append(f"Erro na busca: {str(e)}")
-                    continue
+                            stats_casa = obter_estatisticas_time_filtrado(liga_id, season_temp, id_casa, 'home')
+                            stats_fora = obter_estatisticas_time_filtrado(liga_id, season_temp, id_fora, 'away')
+                            
+                            lambda_gols_casa = (stats_casa['gols_marcados_ft'] + stats_fora['gols_sofridos_ft']) / 2
+                            lambda_gols_fora = (stats_fora['gols_marcados_ft'] + stats_casa['gols_sofridos_ft']) / 2
+                            lambda_ht_casa = (stats_casa['gols_marcados_ht'] + stats_fora['gols_sofridos_ht']) / 2
+                            lambda_ht_fora = (stats_fora['gols_marcados_ht'] + stats_casa['gols_sofridos_ht']) / 2
+                            lambda_cantos_total = stats_casa['cantos_media'] + stats_fora['cantos_media']
+                            lambda_cartoes_total = stats_casa['cartoes_media'] + stats_fora['cartoes_media']
+                            
+                            prob_over_15_ft, prob_btts = calcular_probabilidades_poisson(lambda_gols_casa, lambda_gols_fora)
+                            prob_0_0_ht = poisson.pmf(0, lambda_ht_casa + lambda_ht_fora)
+                            prob_over_05_ht = round((1 - prob_0_0_ht) * 100, 1)
+                            prob_cantos_85 = calcular_mercado_acumulado(lambda_cantos_total, 8.5)
+                            prob_cartoes_45 = calcular_mercado_acumulado(lambda_cartoes_total, 4.5)
+                            
+                            jogos.append({
+                                "Data": dt.strftime("%d/%m"),
+                                "Liga": LIGAS[liga_id], 
+                                "Confronto": f"{home_name} x {away_name}", 
+                                "Hora": dt.strftime("%H:%M"),
+                                "0.5 HT (%)": prob_over_05_ht, 
+                                "Odd Justa HT": calcular_odd_justa(prob_over_05_ht),
+                                "1.5 FT (%)": prob_over_15_ft, 
+                                "Odd Justa 1.5FT": calcular_odd_justa(prob_over_15_ft),
+                                "BTTS Sim (%)": prob_btts, 
+                                "Odd Justa BTTS": calcular_odd_justa(prob_btts),
+                                "Over 8.5 Cantos (%)": prob_cantos_85, 
+                                "Over 4.5 Cartões (%)": prob_cartoes_45
+                            })
+                        break
+            except Exception as e:
+                log.append(f"Erro na busca: {str(e)}")
+                continue
                     
     return pd.DataFrame(jogos), log
 
@@ -153,24 +155,28 @@ st.title("Analisador Profissional asc.bet - Cobertura Global")
 tab1, tab2 = st.tabs(["🔮 Projeções e Odds Justas", "🧪 Painel de Backtesting"])
 
 with tab1:
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         lista_nomes_ligas = sorted(list(LIGAS.values()))
-        ligas_sel = st.multiselect("Selecione as Ligas para Análise", options=lista_nomes_ligas, default=["BRASIL: Série B"])
+        ligas_sel = st.multiselect("1. Selecione as Ligas", options=lista_nomes_ligas, default=["BRASIL: Série B"])
     with col2:
-        btn_rodar = st.button("🔄 PRECIFICAR E BUSCAR JOGOS", type="primary", use_container_width=True)
+        # Novo elemento visual de calendário para você escolher a data manual das rodadas
+        data_busca = st.date_input("2. Data da Rodada", value=datetime.now())
+    with col3:
+        st.write("##") # Alinhamento visual
+        btn_rodar = st.button("🔄 PRECIFICAR JOGOS", type="primary", use_container_width=True)
         
     if btn_rodar:
         ligas_ids_selecionadas = [k for k, v in LIGAS.items() if v in ligas_sel]
-        with st.spinner("Conectando à API e realizando varredura de datas..."):
-            df_hoje, log = buscar_jogos_e_projetar(ligas_ids_selecionadas)
+        with st.spinner("Conectando à API e aplicando modelo estatístico..."):
+            df_hoje, log = buscar_jogos_e_projetar(ligas_ids_selecionadas, data_busca)
         
-        with st.expander("📋 Log do Servidor (Verificar conexões)"):
+        with st.expander("📋 Histórico do Log Técnico"):
             for item in log:
                 st.write(item)
         
         if len(df_hoje) > 0:
-            st.subheader("📊 Painel de Odds Justas e Probabilidades (Próximas 48h)")
+            st.subheader(f"📊 Painel de Odds Justas - Rodada do dia {data_busca.strftime('%d/%m/%Y')}")
             
             def destacar_alta_probabilidade(val):
                 if isinstance(val, (int, float)) and val >= 75.0:
@@ -180,7 +186,7 @@ with tab1:
             colunas_prob = ["0.5 HT (%)", "1.5 FT (%)", "BTTS Sim (%)", "Over 8.5 Cantos (%)", "Over 4.5 Cartões (%)"]
             st.dataframe(df_hoje.style.applymap(destacar_alta_probabilidade, subset=colunas_prob), use_container_width=True)
         else:
-            st.warning("Nenhuma partida encontrada para as próximas 48 horas nas ligas selecionadas. Verifique se os campeonatos estão com rodadas ativas na API.")
+            st.warning("Nenhuma partida listada para esta data específica. Tente avançar ou retroceder um dia no calendário ao lado para sincronizar com o fuso horário da rodada.")
 
 with tab2:
     st.subheader("🧪 Validação Histórica do Modelo (Backtesting)")
@@ -193,6 +199,3 @@ with tab2:
     ])
     st.dataframe(dados_historicos, use_container_width=True)
     if st.button("🚀 INICIAR SIMULAÇÃO HISTÓRICA", type="secondary"):
-        df_res, saldo, taxa = rodar_backtest_simulado(dados_historicos)
-        c1, c2 = st.columns(2)
-        c1.metric("Resultado Líquido do Modelo", f"{saldo:+.2f} Unidades")
