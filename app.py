@@ -228,7 +228,7 @@ def rodar_backtest_simulado(df_historico_jogos):
     tx_acerto = (acertos / apostas_feitas * 100) if apostas_feitas > 0 else 0
     return pd.DataFrame(resultados_backtest), saldo_unidades, tx_acerto
 
-# --- RELATÓRIO PDF TOTALMENTE CORRIGIDO ---
+# --- RELATÓRIO PDF CORRIGIDO ---
 def gerar_pdf_com_odds(df):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
@@ -243,4 +243,5 @@ def gerar_pdf_com_odds(df):
     for r in df.to_dict(orient='records'):
         dados.append([r['Liga'], r['Confronto'], r['Hora'], f"@{r['Odd Justa HT']}", f"@{r['Odd Justa 1.5FT']}", f"@{r['Odd Justa BTTS']}"])
         
-    # Tamanho das colunas do PDF explicitamente definido para evitar erros de sintaxe
+    larguras_colunas = [110, 150, 45, 80, 80, 80]
+    t = Table(dados, colWidths=larguras_colunas)
