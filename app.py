@@ -154,15 +154,28 @@ def buscar_jogos_e_projetar(ligas_ids):
     ano_atual = datetime.now().year
     
     for liga_id in ligas_ids:
-        url = "https://api-sports.io"
-        params = {'league': liga_id, 'season': ano_atual, 'date': hoje}
-        try:
-            r = requests.get(url, headers=HEADERS, params=params)
-            log.append(f"Liga {liga_id} - Status: {r.status_code}")
-            if r.status_code != 200: continue
-            data = r.json()
-        except Exception as e:
-            log.append(f"Erro na liga {liga_id}: {str(e)}")
+        # Tenta buscar na temporada do ano atual e faz o fallback automático se retornar vazio
+        temporadas_teste = [ano_atual, ano_atual - 1]
+        data = None
+        temporada_ativa = ano_atual
+        
+        for season_temp in temporadas_teste:
+            url = "https://api-sports.io"
+            params = {'league': liga_id, 'season': season_temp, 'date': hoje}
+            try:
+                r = requests.get(url, headers=HEADERS, params=params)
+                log.append(f"Liga {liga_id} (Temp {season_temp}) - Status: {r.status_code}")
+                if r.status_code == 200:
+                    res_json = r.json()
+                    if len(res_json.get('response', [])) > 0:
+                        data = res_json
+                        temporada_ativa = season_temp
+                        break
+            except Exception as e:
+                log.append(f"Erro na liga {liga_id} na temp {season_temp}: {str(e)}")
+                continue
+                
+        if not data:
             continue
         
         for fixture in data.get('response', []):
@@ -172,8 +185,8 @@ def buscar_jogos_e_projetar(ligas_ids):
             away_name = fixture['teams']['away']['name']
             dt = datetime.fromisoformat(fixture['fixture']['date'].replace('Z',''))
             
-            stats_casa = obter_estatisticas_time_filtrado(liga_id, ano_atual, id_casa, 'home')
-            stats_fora = obter_estatisticas_time_filtrado(liga_id, ano_atual, id_fora, 'away')
+            stats_casa = obter_estatisticas_time_filtrado(liga_id, temporada_ativa, id_casa, 'home')
+            stats_fora = obter_estatisticas_time_filtrado(liga_id, temporada_ativa, id_fora, 'away')
             
             lambda_gols_casa = (stats_casa['gols_marcados_ft'] + stats_fora['gols_sofridos_ft']) / 2
             lambda_gols_fora = (stats_fora['gols_marcados_ft'] + stats_casa['gols_sofridos_ft']) / 2
@@ -229,19 +242,7 @@ with tab1:
     col1, col2 = st.columns(2)
     with col1:
         lista_nomes_ligas = sorted(list(LIGAS.values()))
-        ligas_sel = st.multiselect("Selecione as Ligas para Análise de Hoje", options=lista_nomes_ligas, default=["BRASIL: Série A"])
+        ligas_sel = st.multiselect("Selecione as Ligas para Análise de Hoje", options=lista_nomes_ligas, default=["BRASIL: Série B"])
     with col2:
         btn_rodar = st.button("🔄 PRECIFICAR E BUSCAR JOGOS DE HOJE", type="primary", use_container_width=True)
         
-    if btn_rodar:
-        ligas_ids_selecionadas = [k for k, v in LIGAS.items() if v in ligas_sel]
-        with st.spinner("Conectando à API Global e aplicando Modelo de Poisson..."):
-            df_hoje, log = buscar_jogos_e_projetar(ligas_ids_selecionadas)
-        
-        if len(df_hoje) > 0:
-            st.subheader("📊 Painel de Odds Justas e Probabilidades")
-            
-            def destacar_alta_probabilidade(val):
-                if isinstance(val, (int, float)) and val >= 75.0:
-                    return 'background-color: #d4edda; color: #155724; font-weight: bold;'
-                return ''
