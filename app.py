@@ -15,7 +15,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide")
 
 # Insira sua chave obtida em api-football.com
-API_FOOTBALL_KEY = "COLA_SUA_CHAVE_AQUI" 
+API_FOOTBALL_KEY = "API_FOOTBALL_KEY = st.secrets["API_KEY"]"
+
 
 LIGAS = {
     71: "BRASILEIRÃO SÉRIE A", 
