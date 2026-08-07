@@ -14,14 +14,91 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide")
 
-# Insira sua chave obtida em api-football.com
-API_FOOTBALL_KEY = "API_FOOTBALL_KEY = st.secrets"
+# O sistema continuará puxando de forma invisível a chave que você salvou nos Secrets
+API_FOOTBALL_KEY = st.secrets["API_KEY"]
 
-
+# DICIONÁRIO EXPANDIDO COM AS IDs OFICIAIS DE TODAS AS LIGAS PEDIDAS (API-FOOTBALL)
 LIGAS = {
-    71: "BRASILEIRÃO SÉRIE A", 
-    72: "BRASILEIRÃO SÉRIE B", 
-    39: "PREMIER LEAGUE"
+    # Brasil
+    71: "BRASIL: Série A", 
+    72: "BRASIL: Série B",
+    73: "BRASIL: Série C",
+    # Inglaterra
+    39: "INGLATERRA: Premier League",
+    40: "INGLATERRA: EFL Championship",
+    41: "INGLATERRA: EFL League One",
+    42: "INGLATERRA: EFL League Two",
+    # Argentina
+    128: "ARGENTINA: Liga Profesional",
+    129: "ARGENTINA: Primera Nacional",
+    # Colômbia
+    239: "COLÔMBIA: Liga BetPlay Dimayor",
+    240: "COLÔMBIA: Torneo BetPlay Dimayor",
+    # Chile
+    265: "CHILE: Primera División",
+    266: "CHILE: Primera B",
+    # Uruguai
+    268: "URUGUAI: Primera División",
+    269: "URUGUAI: Segunda División",
+    # Paraguai
+    252: "PARAGUAI: División de Honor",
+    258: "PARAGUAI: División Intermedia",
+    # Venezuela
+    272: "VENEZUELA: Liga FUTVE",
+    273: "VENEZUELA: Liga FUTVE 2",
+    # México e EUA
+    262: "MÉXICO: Liga MX",
+    253: "EUA: Major League Soccer (MLS)",
+    254: "EUA: USL Championship",
+    # Holanda e Bélgica
+    88: "HOLANDA: Eredivisie",
+    89: "HOLANDA: Eerste Divisie",
+    144: "BÉLGICA: Jupiler Pro League",
+    145: "BÉLGICA: Challenger Pro League",
+    # Escandinávia (Suécia, Dinamarca, Finlândia, Islândia)
+    113: "SUÉCIA: Allsvenskan",
+    114: "SUÉCIA: Superettan",
+    119: "DINAMARCA: Superligaen",
+    120: "DINAMARCA: 1. Division",
+    244: "FINLÂNDIA: Veikkausliiga",
+    172: "ISLÂNDIA: Besta deild karla",
+    # Polônia e Croácia
+    106: "POLÔNIA: Ekstraklasa",
+    107: "POLÔNIA: I Liga",
+    210: "CROÁCIA: HNL",
+    # Ásia e Oceania
+    188: "AUSTRÁLIA: A-League",
+    98: "JAPÃO: J1 League",
+    99: "JAPÃO: J2 League",
+    169: "CHINA: Super League (CSL)",
+    292: "COREIA DO SUL: K League 1",
+    293: "COREIA DO SUL: K League 2",
+    # Europa Central e Leste (Suíça, Turquia, Grécia, Israel, Hungria)
+    207: "SUÍÇA: Super League",
+    203: "TURQUIA: Süper Lig",
+    204: "TURQUIA: TFF 1. Lig",
+    197: "GRÉCIA: Super League 1",
+    383: "ISRAEL: Ligat Ha'Al",
+    271: "HUNGRIA: NB I",
+    # Alemanha
+    78: "ALEMANHA: Bundesliga",
+    79: "ALEMANHA: 2. Bundesliga",
+    80: "ALEMANHA: 3. Liga",
+    # França
+    61: "FRANÇA: Ligue 1",
+    62: "FRANÇA: Ligue 2",
+    # Espanha
+    140: "ESPANHA: La Liga",
+    141: "ESPANHA: La Liga 2",
+    # Portugal
+    94: "PORTUGAL: Primeira Liga",
+    95: "PORTUGAL: Segunda Liga",
+    # Itália
+    135: "ITÁLIA: Serie A",
+    136: "ITÁLIA: Serie B",
+    # Índia e Arábia Saudita
+    323: "ÍNDIA: Indian Super League",
+    307: "ARÁBIA SAUDITA: Saudi Pro League"
 }
 
 HEADERS = {
@@ -166,55 +243,5 @@ def gerar_pdf_com_odds(df):
     for r in df.to_dict(orient='records'):
         dados.append([r['Liga'], r['Confronto'], r['Hora'], f"@{r['Odd Justa HT']}", f"@{r['Odd Justa 1.5FT']}", f"@{r['Odd Justa BTTS']}"])
         
-    t = Table(dados, colWidths=[90, 160, 45, 70, 70, 70])
+    t = Table(dados, colWidths=[120, 140, 50, 70, 70, 70])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1A365D')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E0')),
-        ('FONTSIZE', (0,0), (-1,-1), 9)
-    ]))
-    story.append(t)
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
-
-# --- INTERFACE STREAMLIT ---
-st.title("Analisador Profissional asc.bet - Sistema Online")
-tab1, tab2 = st.tabs(["🔮 Projeções e Odds Justas", "🧪 Painel de Backtesting"])
-
-with tab1:
-    col1, col2 = st.columns(2)
-    with col1:
-        ligas_sel = st.multiselect("Selecione as Ligas", options=list(LIGAS.values()), default=["BRASILEIRÃO SÉRIE A"])
-    with col2:
-        btn_rodar = st.button("🔄 PRECIFICAR E BUSCAR JOGOS DE HOJE", type="primary", use_container_width=True)
-        
-    if btn_rodar:
-        if API_FOOTBALL_KEY == "COLA_SUA_CHAVE_AQUI":
-            st.error("Insira sua chave API no código fonte (variável API_FOOTBALL_KEY).")
-        else:
-            with st.spinner("Puxando estatísticas e aplicando Poisson..."):
-                df_hoje, log = buscar_jogos_e_projetar(ligas_ids_sel = [k for k,v in LIGAS.items() if v in ligas_sel])
-            
-            if len(df_hoje) > 0:
-                st.subheader("📊 Painel de Odds Justas e Probabilidades")
-                st.dataframe(df_hoje, use_container_width=True)
-                
-                pdf = gerar_pdf_com_odds(df_hoje)
-                st.download_button("📥 DOWNLOAD RELATÓRIO ODDS JUSTAS (PDF)", data=pdf, file_name="odds_justas.pdf", mime="application/pdf")
-            else:
-                st.warning("Nenhum jogo programado para hoje nestas ligas.")
-
-with tab2:
-    st.subheader("🧪 Validação Histórica do Modelo (Backtesting)")
-    dados_historicos = pd.DataFrame([
-        {"Jogo": "Botafogo x Fluminense", "Odd Justa": 1.35, "Odd Casa": 1.55, "Resultado Real": "Green"},
-        {"Jogo": "Cruzeiro x Vasco", "Odd Justa": 1.40, "Odd Casa": 1.62, "Resultado Real": "Red"},
-        {"Jogo": "Atlético-MG x Grêmio", "Odd Justa": 1.25, "Odd Casa": 1.45, "Resultado Real": "Green"},
-        {"Jogo": "Bahia x Fortaleza", "Odd Justa": 1.50, "Odd Casa": 1.38, "Resultado Real": "Green"},
-        {"Jogo": "Internacional x Cuiabá", "Odd Justa": 1.30, "Odd Casa": 1.60, "Resultado Real": "Green"}
-    ])
-    st.dataframe(dados_historicos, use_container_width=True)
-    if st.button("🚀 INICIAR SIMULAÇÃO HISTÓRICA", type="secondary"):
-        df_res, saldo, taxa = rodar_backtest_simulado(dados_historicos)
