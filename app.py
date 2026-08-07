@@ -4,13 +4,6 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from scipy.stats import poisson
-from io import BytesIO
-
-# Importações do ReportLab
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide")
 
@@ -228,20 +221,27 @@ def rodar_backtest_simulado(df_historico_jogos):
     tx_acerto = (acertos / apostas_feitas * 100) if apostas_feitas > 0 else 0
     return pd.DataFrame(resultados_backtest), saldo_unidades, tx_acerto
 
-# --- RELATÓRIO PDF CORRIGIDO ---
-def gerar_pdf_com_odds(df):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
-    story = []
-    styles = getSampleStyleSheet()
-    
-    style_tit = ParagraphStyle('T', fontSize=18, leading=22, textColor=colors.HexColor('#1A365D'), alignment=1, spaceAfter=15)
-    story.append(Paragraph("<b>asc.bet Pro</b> - Relatório de Odds Justas", style_tit))
-    
-    headers = ["Liga", "Confronto", "Hora", "0.5HT Justa", "1.5FT Justa", "BTTS Justa"]
-    dados = [headers]
-    for r in df.to_dict(orient='records'):
-        dados.append([r['Liga'], r['Confronto'], r['Hora'], f"@{r['Odd Justa HT']}", f"@{r['Odd Justa 1.5FT']}", f"@{r['Odd Justa BTTS']}"])
+# --- INTERFACE STREAMLIT ---
+st.title("Analisador Profissional asc.bet - Cobertura Global")
+tab1, tab2 = st.tabs(["🔮 Projeções e Odds Justas", "🧪 Painel de Backtesting"])
+
+with tab1:
+    col1, col2 = st.columns(2)
+    with col1:
+        lista_nomes_ligas = sorted(list(LIGAS.values()))
+        ligas_sel = st.multiselect("Selecione as Ligas para Análise de Hoje", options=lista_nomes_ligas, default=["BRASIL: Série A"])
+    with col2:
+        btn_rodar = st.button("🔄 PRECIFICAR E BUSCAR JOGOS DE HOJE", type="primary", use_container_width=True)
         
-    larguras_colunas = [110, 150, 45, 80, 80, 80]
-    t = Table(dados, colWidths=larguras_colunas)
+    if btn_rodar:
+        ligas_ids_selecionadas = [k for k, v in LIGAS.items() if v in ligas_sel]
+        with st.spinner("Conectando à API Global e aplicando Modelo de Poisson..."):
+            df_hoje, log = buscar_jogos_e_projetar(ligas_ids_selecionadas)
+        
+        if len(df_hoje) > 0:
+            st.subheader("📊 Painel de Odds Justas e Probabilidades")
+            
+            def destacar_alta_probabilidade(val):
+                if isinstance(val, (int, float)) and val >= 75.0:
+                    return 'background-color: #d4edda; color: #155724; font-weight: bold;'
+                return ''
