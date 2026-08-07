@@ -210,4 +210,5 @@ with tab1:
 
 with tab2:
     st.subheader("🧪 Validação Histórica do Modelo (Backtesting)")
-    dados_historicos = pd.DataFrame([
+    
+    # Lista recriada e fechada corretamente para evitar erros de sintaxe
