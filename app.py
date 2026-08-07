@@ -82,14 +82,13 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     jogos = []
     log = []
     
-    # Converte o objeto de data do Streamlit para o formato de texto da API
     data_formatada = data_escolhida.strftime("%Y-%m-%d")
     ano_atual = data_escolhida.year
     temporadas_para_buscar = [ano_atual, ano_atual - 1]
     
     for liga_id in ligas_ids:
         for season_temp in temporadas_para_buscar:
-            url = "https://v3.football.api-sports.io/fixtures"
+            url = "https://api-sports.io"
             params = {'league': liga_id, 'season': season_temp, 'date': data_formatada}
             try:
                 r = requests.get(url, headers=HEADERS, params=params)
@@ -98,7 +97,6 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
                 if r.status_code == 200:
                     res_json = r.json()
                     
-                    # Registra no log caso a chave esteja com algum bloqueio ou limite
                     if "errors" in res_json and res_json["errors"]:
                         log.append(f"⚠️ Alerta da API na Liga {liga_id}: {res_json['errors']}")
                         
@@ -150,20 +148,42 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
                     
     return pd.DataFrame(jogos), log
 
+def rodar_backtest_simulado(df_historico_jogos):
+    saldo_unidades = 0.0
+    apostas_feitas = 0
+    acertos = 0
+    resultados_backtest = []
+    
+    for jogo in df_historico_jogos.to_dict(orient='records'):
+        if jogo['Odd Casa'] > jogo['Odd Justa']:
+            apostas_feitas += 1
+            if jogo['Resultado Real'] == "Green":
+                saldo_unidades += (jogo['Odd Casa'] - 1)
+                acertos += 1
+                status = "✅ GANHOU"
+            else:
+                saldo_unidades -= 1
+                status = "❌ PERDEU"
+            resultados_backtest.append({
+                "Jogo": jogo['Jogo'], "Odd Casa": jogo['Odd Casa'], 
+                "Odd Justa": jogo['Odd Justa'], "Status": status, "Saldo Acumulado": round(saldo_unidades, 2)
+            })
+    tx_acerto = (acertos / apostas_feitas * 100) if apostas_feitas > 0 else 0
+    return pd.DataFrame(resultados_backtest), saldo_unidades, tx_acerto
+
 # --- INTERFACE ---
 st.title("Analisador Profissional asc.bet - Cobertura Global")
 tab1, tab2 = st.tabs(["🔮 Projeções e Odds Justas", "🧪 Painel de Backtesting"])
 
 with tab1:
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col1, col2, col3 = st.columns(3)
     with col1:
         lista_nomes_ligas = sorted(list(LIGAS.values()))
         ligas_sel = st.multiselect("1. Selecione as Ligas", options=lista_nomes_ligas, default=["BRASIL: Série B"])
     with col2:
-        # Novo elemento visual de calendário para você escolher a data manual das rodadas
         data_busca = st.date_input("2. Data da Rodada", value=datetime.now())
     with col3:
-        st.write("##") # Alinhamento visual
+        st.write("##") 
         btn_rodar = st.button("🔄 PRECIFICAR JOGOS", type="primary", use_container_width=True)
         
     if btn_rodar:
@@ -191,11 +211,3 @@ with tab1:
 with tab2:
     st.subheader("🧪 Validação Histórica do Modelo (Backtesting)")
     dados_historicos = pd.DataFrame([
-        {"Jogo": "Botafogo x Fluminense", "Odd Justa": 1.35, "Odd Casa": 1.55, "Resultado Real": "Green"},
-        {"Jogo": "Cruzeiro x Vasco", "Odd Justa": 1.40, "Odd Casa": 1.62, "Resultado Real": "Red"},
-        {"Jogo": "Atlético-MG x Grêmio", "Odd Justa": 1.25, "Odd Casa": 1.45, "Resultado Real": "Green"},
-        {"Jogo": "Bahia x Fortaleza", "Odd Justa": 1.50, "Odd Casa": 1.38, "Resultado Real": "Green"},
-        {"Jogo": "Internacional x Cuiabá", "Odd Justa": 1.30, "Odd Casa": 1.60, "Resultado Real": "Green"}
-    ])
-    st.dataframe(dados_historicos, use_container_width=True)
-    if st.button("🚀 INICIAR SIMULAÇÃO HISTÓRICA", type="secondary"):
