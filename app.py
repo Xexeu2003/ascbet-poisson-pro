@@ -165,7 +165,7 @@ def gerar_pdf_com_odds(df):
     for r in df.to_dict(orient='records'):
         dados.append([r['Liga'], r['Confronto'], r['Hora'], f"@{r['Odd Justa HT']}", f"@{r['Odd Justa 1.5FT']}", f"@{r['Odd Justa BTTS']}"])
         
-    t = Table(dados, colWidths=[90, 140, 50, 75, 75, 75])
+    t = Table(dados, colWidths=[90, 160, 45, 70, 70, 70])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1A365D')),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -183,7 +183,7 @@ st.title("Analisador Profissional asc.bet - Sistema Online")
 tab1, tab2 = st.tabs(["🔮 Projeções e Odds Justas", "🧪 Painel de Backtesting"])
 
 with tab1:
-    col1, col2 = st.columns()
+    col1, col2 = st.columns(2)
     with col1:
         ligas_sel = st.multiselect("Selecione as Ligas", options=list(LIGAS.values()), default=["BRASILEIRÃO SÉRIE A"])
     with col2:
