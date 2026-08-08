@@ -86,11 +86,7 @@ def buscar_stats_local(team_id, liga_id, season):
         row = cursor.fetchone()
         conn.close()
         if row:
-            return {
-                'gols_marcados_ht': row[0], 'gols_sofridos_ht': row[1],
-                'gols_marcados_ft': row[2], 'gols_sofridos_ft': row[3],
-                'cantos_media': row[4], 'cartoes_media': row[5]
-            }
+            return {'gols_marcados_ht': row[0], 'gols_sofridos_ht': row[1], 'gols_marcados_ft': row[2], 'gols_sofridos_ft': row[3], 'cantos_media': row[4], 'cartoes_media': row[5]}
     except:
         pass
     return None
@@ -175,19 +171,18 @@ def obter_estatisticas_time_filtrado(liga_id, season, team_id, log_list):
 
     try:
         r = requests.get(url, headers=HEADERS, params=params)
-        if r.status_code == 429 or "requests" in r.text.lower():
+        if r.status_code != 200: 
             return dados_padrao
-        if r.status_code != 200: return dados_padrao
         
         res_data = r.json().get('response', {})
         gols = res_data.get('goals', {})
         gols_m_ft = float(gols.get('for', {}).get('average', {}).get('total', 1.3))
         gols_s_ft = float(gols.get('against', {}).get('average', {}).get('total', 1.1))
+        cantos_f = float(res_data.get('corners', {}).get('for', {}).get('average', {}).get('total', 5.0))
+        cartoes_f = float(res_data.get('cards', {}).get('yellow', {}).get('total', {}).get('average', 2.0) or 2.0)
         
-        # CORREÇÃO DA LINHA 188: Estruturação limpa e explícita do dicionário
-        resultado_stats = {
-            'gols_marcados_ht': gols_m_ft * 0.45,
-            'gols_sofridos_ht': gols_s_ft * 0.45,
-            'gols_marcados_ft': gols_m_ft,
-            'gols_sofridos_ft': gols_s_ft,
-            'cantos_media': float(res_data.get('corners', {}).get('for', {}).get('average', {}).get('total', 5.0)),
+        # CORREÇÃO E COMPACTAÇÃO DEFINITIVA DA LINHA 188
+        resultado_stats = {'gols_marcados_ht': gols_m_ft * 0.45, 'gols_sofridos_ht': gols_s_ft * 0.45, 'gols_marcados_ft': gols_m_ft, 'gols_sofridos_ft': gols_s_ft, 'cantos_media': cantos_f, 'cartoes_media': cartoes_f}
+        
+        salvar_stats_local(team_id, liga_id, season, resultado_stats)
+        return resultado_stats
