@@ -155,34 +155,31 @@ def calcular_odd_justa(probabilidade):
     if probabilidade <= 0: return 99.0
     return round(100 / probabilidade, 2)
 
-# --- REQUISIÇÕES DA API ---
+# --- REQUISIÇÕES DA API (CORRIGIDA E SEM BLOCOS CONFLITANTES) ---
 def obter_estatisticas_time_filtrado(liga_id, season, team_id, log_list):
     dados_locais = buscar_stats_local(team_id, liga_id, season)
     if dados_locais:
         log_list.append(f"📦 [Banco Local] Estatísticas recuperadas para o Time {team_id}")
         return dados_locais
 
-    url = "https://api-sports.io"
-    params = {'league': liga_id, 'season': season, 'team': team_id}
     dados_padrao = {'gols_marcados_ht': 0.6, 'gols_sofridos_ht': 0.5, 'gols_marcados_ft': 1.3, 'gols_sofridos_ft': 1.1, 'cantos_media': 5.0, 'cartoes_media': 2.2}
-    
     if not API_FOOTBALL_KEY:
         return dados_padrao
 
-    try:
-        r = requests.get(url, headers=HEADERS, params=params)
-        if r.status_code != 200: 
-            return dados_padrao
-        
-        res_data = r.json().get('response', {})
-        gols = res_data.get('goals', {})
-        gols_m_ft = float(gols.get('for', {}).get('average', {}).get('total', 1.3))
-        gols_s_ft = float(gols.get('against', {}).get('average', {}).get('total', 1.1))
-        cantos_f = float(res_data.get('corners', {}).get('for', {}).get('average', {}).get('total', 5.0))
-        cartoes_f = float(res_data.get('cards', {}).get('yellow', {}).get('total', {}).get('average', 2.0) or 2.0)
-        
-        # CORREÇÃO E COMPACTAÇÃO DEFINITIVA DA LINHA 188
-        resultado_stats = {'gols_marcados_ht': gols_m_ft * 0.45, 'gols_sofridos_ht': gols_s_ft * 0.45, 'gols_marcados_ft': gols_m_ft, 'gols_sofridos_ft': gols_s_ft, 'cantos_media': cantos_f, 'cartoes_media': cartoes_f}
-        
-        salvar_stats_local(team_id, liga_id, season, resultado_stats)
-        return resultado_stats
+    r = requests.get("https://api-sports.io", headers=HEADERS, params={'league': liga_id, 'season': season, 'team': team_id})
+    if r.status_code != 200: 
+        return dados_padrao
+    
+    res_data = r.json().get('response', {})
+    gols = res_data.get('goals', {})
+    gols_m_ft = float(gols.get('for', {}).get('average', {}).get('total', 1.3))
+    gols_s_ft = float(gols.get('against', {}).get('average', {}).get('total', 1.1))
+    cantos_f = float(res_data.get('corners', {}).get('for', {}).get('average', {}).get('total', 5.0))
+    cartoes_f = float(res_data.get('cards', {}).get('yellow', {}).get('total', {}).get('average', 2.0) or 2.0)
+    
+    resultado_stats = {'gols_marcados_ht': gols_m_ft * 0.45, 'gols_sofridos_ht': gols_s_ft * 0.45, 'gols_marcados_ft': gols_m_ft, 'gols_sofridos_ft': gols_s_ft, 'cantos_media': cantos_f, 'cartoes_media': cartoes_f}
+    salvar_stats_local(team_id, liga_id, season, resultado_stats)
+    return resultado_stats
+
+def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
+    data_formatada = data_escolhida.strftime("%Y-%m-%d")
