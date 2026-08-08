@@ -12,22 +12,37 @@ st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide")
 # PROTEÇÃO AVANÇADA: st.secrets.get() evita que o Streamlit quebre se o arquivo de secrets não existir
 API_FOOTBALL_KEY = st.secrets.get("API_KEY", None)
 
-# Mapeamento de Ligas
+# Mapeamento completo com as IDs oficiais da API-Football correspondentes à sua lista
 LIGAS = {
+    # Brasil
     71: "BRASIL: Série A", 72: "BRASIL: Série B", 73: "BRASIL: Série C",
+    # Inglaterra
     39: "INGLATERRA: Premier League", 40: "INGLATERRA: EFL Championship", 41: "INGLATERRA: EFL League One", 42: "INGLATERRA: EFL League Two",
+    # Argentina
     128: "ARGENTINA: Liga Profesional", 129: "ARGENTINA: Primera Nacional",
+    # EUA e México
     253: "EUA: Major League Soccer (MLS)", 255: "EUA: USL Championship", 262: "MÉXICO: Liga MX",
+    # Colômbia e Chile
     239: "COLÔMBIA: Primera A", 240: "COLÔMBIA: Primera B", 265: "CHILE: Primera División", 266: "CHILE: Primera B",
+    # Uruguai e Paraguai
     268: "URUGUAI: Primera División", 269: "URUGUAI: Segunda División", 242: "PARAGUAI: Primera División", 243: "PARAGUAI: División Intermedia",
+    # Venezuela e Peru
     271: "VENEZUELA: Liga FUTVE", 272: "VENEZUELA: Liga FUTVE 2", 281: "PERU: Liga 1", 282: "PERU: Liga 2",
+    # Holanda e Bélgica
     88: "HOLANDA: Eredivisie", 89: "HOLANDA: Eerste Divisie", 144: "BÉLGICA: Jupiler Pro League", 145: "BÉLGICA: Challenger Pro League",
+    # Suécia e Dinamarca
     113: "SUÉCIA: Allsvenskan", 114: "SUÉCIA: Superettan", 119: "DINAMARCA: Superligaen", 120: "DINAMARCA: 1st Division", 121: "DINAMARCA: 2nd Division",
+    # Finlândia e Islândia
     244: "FINLÂNDIA: Veikkausliiga", 245: "FINLÂNDIA: Ykkösliiga", 246: "FINLÂNDIA: Kakkonen", 182: "ISLÂNDIA: Besta deild karla", 183: "ISLÂNDIA: 1. deild karla",
+    # Polônia e Croácia
     106: "POLÔNIA: Ekstraklasa", 107: "POLÔNIA: I Liga", 108: "POLÔNIA: II Liga", 210: "CROÁCIA: HNL", 211: "CROÁCIA: Prva NL",
+    # Alemanha e França
     78: "ALEMANHA: Bundesliga", 79: "ALEMANHA: 2. Bundesliga", 80: "ALEMANHA: 3. Liga", 81: "ALEMANHA: Regionalliga", 61: "FRANÇA: Ligue 1", 62: "FRANÇA: Ligue 2",
+    # Espanha e Portugal
     140: "ESPANHA: La Liga", 141: "ESPANHA: La Liga 2", 94: "PORTUGAL: Primeira Liga", 95: "PORTUGAL: Segunda Liga",
+    # Itália e Arábia Saudita
     135: "ITÁLIA: Serie A", 136: "ITÁLIA: Serie B", 137: "ITÁLIA: Serie C", 307: "ARÁBIA SAUDITA: Saudi Pro League", 308: "ARÁBIA SAUDITA: Yelo League",
+    # Ásia, Oceania e Europa Restante
     203: "TURQUIA: Süper Lig", 204: "TURQUIA: TFF 1. Lig", 197: "GRÉCIA: Super League 1", 383: "ISRAEL: Ligat Ha'Al", 384: "ISRAEL: Liga Leumit",
     188: "AUSTRÁLIA: A-League", 98: "JAPÃO: J1 League", 99: "JAPÃO: J2 League", 169: "CHINA: Super League", 170: "CHINA: League One",
     292: "COREIA DO SUL: K League 1", 293: "COREIA DO SUL: K League 2", 278: "ÍNDIA: Indian Super League", 279: "ÍNDIA: I-League",
@@ -45,8 +60,6 @@ def inicializar_e_limpar_banco():
     try:
         conn = sqlite3.connect(NOME_BANCO)
         cursor = conn.cursor()
-        
-        # CORREÇÃO: Remoção do date('now') problemático da estrutura do banco
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS stats_times (
                 team_id INTEGER, liga_id INTEGER, season INTEGER,
@@ -65,8 +78,6 @@ def inicializar_e_limpar_banco():
                 data_calculo TEXT
             )
         ''')
-        
-        # Filtros de limpeza calculados com segurança via Python puro
         data_limite = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
         cursor.execute("DELETE FROM stats_times WHERE data_registro < ?", (data_limite,))
         cursor.execute("DELETE FROM historico_partidas WHERE data_calculo < ?", (data_limite,))
@@ -180,10 +191,3 @@ def obter_estatisticas_time_filtrado(liga_id, season, team_id, log_list):
     cartoes_f = float(res_data.get('cards', {}).get('yellow', {}).get('total', {}).get('average', 2.0) or 2.0)
     
     resultado_stats = {'gols_marcados_ht': gols_m_ft * 0.45, 'gols_sofridos_ht': gols_s_ft * 0.45, 'gols_marcados_ft': gols_m_ft, 'gols_sofridos_ft': gols_s_ft, 'cantos_media': cantos_f, 'cartoes_media': cartoes_f}
-    salvar_stats_local(team_id, liga_id, season, resultado_stats)
-    return resultado_stats
-
-def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
-    data_formatada = data_escolhida.strftime("%Y-%m-%d")
-    df_local = buscar_jogos_calculados_local(ligas_ids, data_formatada)
-    if not df_local.empty:
