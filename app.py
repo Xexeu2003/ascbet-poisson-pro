@@ -11,7 +11,7 @@ st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide")
 # Puxa a chave dos Secrets do Streamlit Cloud
 API_FOOTBALL_KEY = st.secrets["API_KEY"]
 
-# Mapeamento completo com as IDs oficiais da API-Football correspondentes à sua lista
+# Mapeamento completo de Ligas
 LIGAS = {
     # Brasil
     71: "BRASIL: Série A", 72: "BRASIL: Série B", 73: "BRASIL: Série C",
@@ -53,7 +53,7 @@ HEADERS = {
     'x-rapidapi-host': "v3.football.api-sports.io"
 }
 
-# --- ARQUITETURA DE BANCO DE DADOS AVANÇADA ---
+# --- BANCO DE DADOS ---
 def inicializar_e_limpar_banco():
     conn = sqlite3.connect('analisador_asc_bet.db')
     cursor = conn.cursor()
@@ -191,3 +191,6 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     data_formatada = data_escolhida.strftime("%Y-%m-%d")
     df_local = buscar_jogos_calculados_local(ligas_ids, data_formatada)
     if not df_local.empty:
+        return df_local, ["🚀 [Modo Offline] Exibindo dados de cache local. Nenhuma requisição gasta."]
+
+    jogos = []
