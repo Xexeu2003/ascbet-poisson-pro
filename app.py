@@ -43,7 +43,6 @@ HEADERS = {
     'x-rapidapi-host': "v3.football.api-sports.io"
 }
 
-# --- CORREÇÃO DE DIRETÓRIO PARA AMBIENTE DE NUVEM ---
 NOME_BANCO = os.path.join(os.getcwd(), 'analisador_asc_bet.db')
 
 def inicializar_e_limpar_banco():
@@ -185,7 +184,10 @@ def obter_estatisticas_time_filtrado(liga_id, season, team_id, log_list):
         gols_m_ft = float(gols.get('for', {}).get('average', {}).get('total', 1.3))
         gols_s_ft = float(gols.get('against', {}).get('average', {}).get('total', 1.1))
         
+        # CORREÇÃO DA LINHA 188: Estruturação limpa e explícita do dicionário
         resultado_stats = {
-            'gols_marcados_ht': gols_m_ft * 0.45, 'gols_sofridos_ht': gols_s_ft * 0.45,
-            'gols_marcados_ft': gols_m_ft, 'gols_sofridos_ft': gols_s_ft,
+            'gols_marcados_ht': gols_m_ft * 0.45,
+            'gols_sofridos_ht': gols_s_ft * 0.45,
+            'gols_marcados_ft': gols_m_ft,
+            'gols_sofridos_ft': gols_s_ft,
             'cantos_media': float(res_data.get('corners', {}).get('for', {}).get('average', {}).get('total', 5.0)),
