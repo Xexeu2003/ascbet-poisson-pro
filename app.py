@@ -186,3 +186,4 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     jogos = []
     log = []
     ano_atual = data_escolhida.year
+    temporadas_para_buscar = [ano_atual, ano_atual - 1]
