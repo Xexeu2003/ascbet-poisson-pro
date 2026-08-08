@@ -1,7 +1,9 @@
+import streamlit as pd
 import streamlit as st
 import requests
 import pandas as pd
 import numpy as np
+import sqlite3
 from datetime import datetime, timedelta
 from scipy.stats import poisson
 
@@ -11,17 +13,13 @@ st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide")
 API_FOOTBALL_KEY = st.secrets["API_KEY"]
 
 LIGAS = {
-    # Brasil
     71: "BRASIL: Série A", 
     72: "BRASIL: Série B",
     73: "BRASIL: Série C",
-    # Inglaterra
     39: "INGLATERRA: Premier League",
     40: "INGLATERRA: EFL Championship",
-    # Argentina
     128: "ARGENTINA: Liga Profesional",
     129: "ARGENTINA: Primera Nacional",
-    # México e EUA
     262: "MÉXICO: Liga MX",
     253: "EUA: Major League Soccer (MLS)"
 }
@@ -31,6 +29,112 @@ HEADERS = {
     'x-rapidapi-host': "v3.football.api-sports.io"
 }
 
+# --- ARQUITETURA DE BANCO DE DADOS AVANÇADA ---
+def inicializar_e_limpar_banco():
+    conn = sqlite3.connect('analisador_asc_bet.db')
+    cursor = conn.cursor()
+    
+    # Tabela 1: Estatísticas brutas dos times (Cache de chamadas da API)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS stats_times (
+            team_id INTEGER,
+            liga_id INTEGER,
+            season INTEGER,
+            gols_marcados_ht REAL, gols_sofridos_ht REAL,
+            gols_marcados_ft REAL, gols_sofridos_ft REAL,
+            cantos_media REAL, cartoes_media REAL,
+            data_registro DATE DEFAULT (date('now')),
+            PRIMARY KEY (team_id, liga_id, season)
+        )
+    ''')
+    
+    # Tabela 2: Histórico de partidas já calculadas (Consulta offline retroativa)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS historico_partidas (
+            data_jogo TEXT,
+            liga_id INTEGER,
+            liga_nome TEXT,
+            confronto TEXT,
+            hora TEXT,
+            prob_05_ht REAL, odd_ht REAL,
+            prob_15_ft REAL, odd_15ft REAL,
+            prob_btts REAL, odd_btts REAL,
+            prob_cantos REAL, prob_cartoes REAL,
+            data_calculo DATE DEFAULT (date('now'))
+        )
+    ''')
+    
+    # Rotina de Limpeza Automática: Remove registros com mais de 30 dias
+    data_limite = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    cursor.execute("DELETE FROM stats_times WHERE data_registro < ?", (data_limite,))
+    cursor.execute("DELETE FROM historico_partidas WHERE data_calculo < ?", (data_limite,))
+    
+    conn.commit()
+    conn.close()
+
+# Funções de manipulação do Banco Local
+def buscar_stats_local(team_id, liga_id, season):
+    conn = sqlite3.connect('analisador_asc_bet.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT gols_marcados_ht, gols_sofridos_ht, gols_marcados_ft, gols_sofridos_ft, cantos_media, cartoes_media 
+        FROM stats_times WHERE team_id=? AND liga_id=? AND season=?
+    ''', (team_id, liga_id, season))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {
+            'gols_marcados_ht': row[0], 'gols_sofridos_ht': row[1],
+            'gols_marcados_ft': row[2], 'gols_sofridos_ft': row[3],
+            'cantos_media': row[4], 'cartoes_media': row[5]
+        }
+    return None
+
+def salvar_stats_local(team_id, liga_id, season, stats):
+    conn = sqlite3.connect('analisador_asc_bet.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT OR REPLACE INTO stats_times 
+        (team_id, liga_id, season, gols_marcados_ht, gols_sofridos_ht, gols_marcados_ft, gols_sofridos_ft, cantos_media, cartoes_media, data_registro)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'))
+    ''', (team_id, liga_id, season, stats['gols_marcados_ht'], stats['gols_sofridos_ht'], 
+          stats['gols_marcados_ft'], stats['gols_sofridos_ft'], stats['cantos_media'], stats['cartoes_media']))
+    conn.commit()
+    conn.close()
+
+def buscar_jogos_calculados_local(ligas_ids, data_formatada):
+    conn = sqlite3.connect('analisador_asc_bet.db')
+    # Gera placeholders (?,?,?) dinâmicos conforme a quantidade de ligas selecionadas
+    placeholders = ','.join('?' for _ in ligas_ids)
+    query = f'''
+        SELECT data_jogo, liga_nome, confronto, hora, prob_05_ht, odd_ht, prob_15_ft, odd_15ft, prob_btts, odd_btts, prob_cantos, prob_cartoes
+        FROM historico_partidas WHERE data_jogo = ? AND liga_id IN ({placeholders})
+    '''
+    params = [data_formatada] + list(ligas_ids)
+    df = pd.read_sql_query(query, conn, params=params)
+    conn.close()
+    
+    # Renomeia colunas para manter o padrão visual do DataFrame original do app
+    if not df.empty:
+        df.columns = ["Data", "Liga", "Confronto", "Hora", "0.5 HT (%)", "Odd HT", "1.5 FT (%)", "Odd 1.5FT", "BTTS (%)", "Odd BTTS", "Over 8.5 Cantos (%)", "Over 4.5 Cartões (%)"]
+    return df
+
+def salvar_jogos_calculados_local(jogos_lista):
+    conn = sqlite3.connect('analisador_asc_bet.db')
+    cursor = conn.cursor()
+    for j in jogos_lista:
+        cursor.execute('''
+            INSERT INTO historico_partidas 
+            (data_jogo, liga_id, liga_nome, confronto, hora, prob_05_ht, odd_ht, prob_15_ft, odd_15ft, prob_btts, odd_btts, prob_cantos, prob_cartoes, data_calculo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'))
+        ''', (j['data_jogo'], j['liga_id'], j['Liga'], j['Confronto'], j['Hora'], j['0.5 HT (%)'], j['Odd HT'], j['1.5 FT (%)'], j['Odd 1.5FT'], j['BTTS (%)'], j['Odd BTTS'], j['Over 8.5 Cantos (%)'], j['Over 4.5 Cartões (%)']))
+    conn.commit()
+    conn.close()
+
+# Inicializa o banco e roda o expurgo de dados antigos
+inicializar_e_limpar_banco()
+
+# --- CÁLCULOS E INFERÊNCIAS MATEMÁTICAS ---
 def calcular_probabilidades_poisson(lambda_casa, lambda_fora):
     prob_0_gols = poisson.pmf(0, lambda_casa + lambda_fora)
     prob_1_gol = poisson.pmf(1, lambda_casa + lambda_fora)
@@ -50,39 +154,56 @@ def calcular_odd_justa(probabilidade):
     if probabilidade <= 0: return 99.0
     return round(100 / probabilidade, 2)
 
-@st.cache_data(ttl=3600)
-def obter_estatisticas_time_filtrado(liga_id, season, team_id, contexto):
+# --- REQUISIÇÕES DA API ---
+def obter_estatisticas_time_filtrado(liga_id, season, team_id, log_list):
+    dados_locais = buscar_stats_local(team_id, liga_id, season)
+    if dados_locais:
+        log_list.append(f"📦 [Banco Local] Estatísticas do Time {team_id} carregadas.")
+        return dados_locais
+
     url = "https://api-sports.io"
     params = {'league': liga_id, 'season': season, 'team': team_id}
-    dados_padrao = {
-        'gols_marcados_ht': 0.6, 'gols_sofridos_ht': 0.5,
-        'gols_marcados_ft': 1.3, 'gols_sofridos_ft': 1.1,
-        'cantos_media': 5.0, 'cartoes_media': 2.2
-    }
+    dados_padrao = {'gols_marcados_ht': 0.6, 'gols_sofridos_ht': 0.5, 'gols_marcados_ft': 1.3, 'gols_sofridos_ft': 1.1, 'cantos_media': 5.0, 'cartoes_media': 2.2}
+    
     try:
         r = requests.get(url, headers=HEADERS, params=params)
+        if r.status_code == 429 or "requests" in r.text.lower():
+            st.error("🚨 Limite diário de requisições esgotado na API-Football!")
+            return dados_padrao
         if r.status_code != 200: return dados_padrao
-        res = r.json().get('response', {})
-        gols = res.get('goals', {})
-        gols_marcados = float(gols.get('for', {}).get('average', {}).get(contexto, 1.3))
-        gols_sofridos = float(gols.get('against', {}).get('average', {}).get(contexto, 1.1))
-        return {
-            'gols_marcados_ht': gols_marcados * 0.45,
-            'gols_sofridos_ht': gols_sofridos * 0.45,
-            'gols_marcados_ft': gols_marcados,
-            'gols_sofridos_ft': gols_sofridos,
-            'cantos_media': 5.2,
-            'cartoes_media': 2.4
+        
+        res = r.json()
+        if "errors" in res and "requests" in str(res["errors"]).lower():
+            st.error("🚨 Limite de chamadas estourado no plano da API!")
+            return dados_padrao
+            
+        res_data = res.get('response', {})
+        gols = res_data.get('goals', {})
+        gols_marcados_ft = float(gols.get('for', {}).get('average', {}).get('total', 1.3))
+        gols_sofridos_ft = float(gols.get('against', {}).get('average', {}).get('total', 1.1))
+        
+        resultado_stats = {
+            'gols_marcados_ht': gols_marcados_ft * 0.45, 'gols_sofridos_ht': gols_sofridos_ft * 0.45,
+            'gols_marcados_ft': gols_marcados_ft, 'gols_sofridos_ft': gols_sofridos_ft,
+            'cantos_media': float(res_data.get('corners', {}).get('for', {}).get('average', {}).get('total', 5.0)),
+            'cartoes_media': float(res_data.get('cards', {}).get('yellow', {}).get('total', {}).get('average', 2.0) or 2.0)
         }
+        salvar_stats_local(team_id, liga_id, season, resultado_stats)
+        return resultado_stats
     except:
         return dados_padrao
 
-@st.cache_data(ttl=300)
 def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
+    data_formatada = data_escolhida.strftime("%Y-%m-%d")
+    
+    # PASSO 1: Tenta resgatar os confrontos inteiros já calculados no banco local
+    df_local = buscar_jogos_calculated_local(ligas_ids, data_formatada)
+    if not df_local.empty:
+        return df_local, [f"🚀 [Modo Offline] Exibindo {len(df_local)} jogos processados localmente em buscas anteriores. Nenhuma requisição consumida!"]
+
+    # PASSO 2: Se não existirem no banco, faz a busca na API web externa
     jogos = []
     log = []
-    
-    data_formatada = data_escolhida.strftime("%Y-%m-%d")
     ano_atual = data_escolhida.year
     temporadas_para_buscar = [ano_atual, ano_atual - 1]
     
@@ -92,123 +213,15 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
             params = {'league': liga_id, 'season': season_temp, 'date': data_formatada}
             try:
                 r = requests.get(url, headers=HEADERS, params=params)
-                log.append(f"Liga {liga_id} (Temp {season_temp}) - HTTP Status: {r.status_code}")
-                
+                if r.status_code == 429 or "requests" in r.text.lower():
+                    st.error("🚨 Limite diário de requisições atingido ao buscar rodada!")
+                    break
+                    
                 if r.status_code == 200:
                     res_json = r.json()
-                    
-                    if "errors" in res_json and res_json["errors"]:
-                        log.append(f"⚠️ Alerta da API na Liga {liga_id}: {res_json['errors']}")
+                    if "errors" in res_json and "requests" in str(res_json["errors"]).lower():
+                        st.error("🚨 Limite de requisições excedido no plano da API!")
+                        break
                         
                     fixtures = res_json.get('response', [])
                     if len(fixtures) > 0:
-                        log.append(f"✅ Sucesso: Encontrados {len(fixtures)} jogos no dia {data_formatada}")
-                        
-                        for fixture in fixtures:
-                            id_casa = fixture['teams']['home']['id']
-                            id_fora = fixture['teams']['away']['id']
-                            home_name = fixture['teams']['home']['name']
-                            away_name = fixture['teams']['away']['name']
-                            dt = datetime.fromisoformat(fixture['fixture']['date'].replace('Z',''))
-                            
-                            stats_casa = obter_estatisticas_time_filtrado(liga_id, season_temp, id_casa, 'home')
-                            stats_fora = obter_estatisticas_time_filtrado(liga_id, season_temp, id_fora, 'away')
-                            
-                            lambda_gols_casa = (stats_casa['gols_marcados_ft'] + stats_fora['gols_sofridos_ft']) / 2
-                            lambda_gols_fora = (stats_fora['gols_marcados_ft'] + stats_casa['gols_sofridos_ft']) / 2
-                            lambda_ht_casa = (stats_casa['gols_marcados_ht'] + stats_fora['gols_sofridos_ht']) / 2
-                            lambda_ht_fora = (stats_fora['gols_marcados_ht'] + stats_casa['gols_sofridos_ht']) / 2
-                            lambda_cantos_total = stats_casa['cantos_media'] + stats_fora['cantos_media']
-                            lambda_cartoes_total = stats_casa['cartoes_media'] + stats_fora['cartoes_media']
-                            
-                            prob_over_15_ft, prob_btts = calcular_probabilidades_poisson(lambda_gols_casa, lambda_gols_fora)
-                            prob_0_0_ht = poisson.pmf(0, lambda_ht_casa + lambda_ht_fora)
-                            prob_over_05_ht = round((1 - prob_0_0_ht) * 100, 1)
-                            prob_cantos_85 = calcular_mercado_acumulado(lambda_cantos_total, 8.5)
-                            prob_cartoes_45 = calcular_mercado_acumulado(lambda_cartoes_total, 4.5)
-                            
-                            jogos.append({
-                                "Data": dt.strftime("%d/%m"),
-                                "Liga": LIGAS[liga_id], 
-                                "Confronto": f"{home_name} x {away_name}", 
-                                "Hora": dt.strftime("%H:%M"),
-                                "0.5 HT (%)": prob_over_05_ht, 
-                                "Odd Justa HT": calcular_odd_justa(prob_over_05_ht),
-                                "1.5 FT (%)": prob_over_15_ft, 
-                                "Odd Justa 1.5FT": calcular_odd_justa(prob_over_15_ft),
-                                "BTTS Sim (%)": prob_btts, 
-                                "Odd Justa BTTS": calcular_odd_justa(prob_btts),
-                                "Over 8.5 Cantos (%)": prob_cantos_85, 
-                                "Over 4.5 Cartões (%)": prob_cartoes_45
-                            })
-                        break
-            except Exception as e:
-                log.append(f"Erro na busca: {str(e)}")
-                continue
-                    
-    return pd.DataFrame(jogos), log
-
-def rodar_backtest_simulado(df_historico_jogos):
-    saldo_unidades = 0.0
-    apostas_feitas = 0
-    acertos = 0
-    resultados_backtest = []
-    
-    for jogo in df_historico_jogos.to_dict(orient='records'):
-        if jogo['Odd Casa'] > jogo['Odd Justa']:
-            apostas_feitas += 1
-            if jogo['Resultado Real'] == "Green":
-                saldo_unidades += (jogo['Odd Casa'] - 1)
-                acertos += 1
-                status = "✅ GANHOU"
-            else:
-                saldo_unidades -= 1
-                status = "❌ PERDEU"
-            resultados_backtest.append({
-                "Jogo": jogo['Jogo'], "Odd Casa": jogo['Odd Casa'], 
-                "Odd Justa": jogo['Odd Justa'], "Status": status, "Saldo Acumulado": round(saldo_unidades, 2)
-            })
-    tx_acerto = (acertos / apostas_feitas * 100) if apostas_feitas > 0 else 0
-    return pd.DataFrame(resultados_backtest), saldo_unidades, tx_acerto
-
-# --- INTERFACE ---
-st.title("Analisador Profissional asc.bet - Cobertura Global")
-tab1, tab2 = st.tabs(["🔮 Projeções e Odds Justas", "🧪 Painel de Backtesting"])
-
-with tab1:
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        lista_nomes_ligas = sorted(list(LIGAS.values()))
-        ligas_sel = st.multiselect("1. Selecione as Ligas", options=lista_nomes_ligas, default=["BRASIL: Série B"])
-    with col2:
-        data_busca = st.date_input("2. Data da Rodada", value=datetime.now())
-    with col3:
-        st.write("##") 
-        btn_rodar = st.button("🔄 PRECIFICAR JOGOS", type="primary", use_container_width=True)
-        
-    if btn_rodar:
-        ligas_ids_selecionadas = [k for k, v in LIGAS.items() if v in ligas_sel]
-        with st.spinner("Conectando à API e aplicando modelo estatístico..."):
-            df_hoje, log = buscar_jogos_e_projetar(ligas_ids_selecionadas, data_busca)
-        
-        with st.expander("📋 Histórico do Log Técnico"):
-            for item in log:
-                st.write(item)
-        
-        if len(df_hoje) > 0:
-            st.subheader(f"📊 Painel de Odds Justas - Rodada do dia {data_busca.strftime('%d/%m/%Y')}")
-            
-            def destacar_alta_probabilidade(val):
-                if isinstance(val, (int, float)) and val >= 75.0:
-                    return 'background-color: #d4edda; color: #155724; font-weight: bold;'
-                return ''
-                
-            colunas_prob = ["0.5 HT (%)", "1.5 FT (%)", "BTTS Sim (%)", "Over 8.5 Cantos (%)", "Over 4.5 Cartões (%)"]
-            st.dataframe(df_hoje.style.applymap(destacar_alta_probabilidade, subset=colunas_prob), use_container_width=True)
-        else:
-            st.warning("Nenhuma partida listada para esta data específica. Tente avançar ou retroceder um dia no calendário ao lado para sincronizar com o fuso horário da rodada.")
-
-with tab2:
-    st.subheader("🧪 Validação Histórica do Modelo (Backtesting)")
-    
-    # Lista recriada e fechada corretamente para evitar erros de sintaxe
