@@ -9,12 +9,8 @@ from scipy.stats import poisson
 
 st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide")
 
-# PROTEÇÃO: Verifica se o segredo existe no painel para evitar tela branca silenciosa
-if "API_KEY" in st.secrets:
-    API_FOOTBALL_KEY = st.secrets["API_KEY"]
-else:
-    st.error("🔑 Erro de Configuração: A chave 'API_KEY' não foi encontrada nos 'Secrets' do seu painel do Streamlit Cloud. Adicione-a para liberar o sistema.")
-    API_FOOTBALL_KEY = None
+# PROTEÇÃO AVANÇADA: st.secrets.get() evita que o Streamlit quebre se o arquivo de secrets não existir
+API_FOOTBALL_KEY = st.secrets.get("API_KEY", None)
 
 # Mapeamento de Ligas
 LIGAS = {
@@ -155,7 +151,7 @@ def calcular_odd_justa(probabilidade):
     if probabilidade <= 0: return 99.0
     return round(100 / probabilidade, 2)
 
-# --- REQUISIÇÕES DA API (CORRIGIDA E SEM BLOCOS CONFLITANTES) ---
+# --- REQUISIÇÕES DA API ---
 def obter_estatisticas_time_filtrado(liga_id, season, team_id, log_list):
     dados_locais = buscar_stats_local(team_id, liga_id, season)
     if dados_locais:
@@ -183,3 +179,10 @@ def obter_estatisticas_time_filtrado(liga_id, season, team_id, log_list):
 
 def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     data_formatada = data_escolhida.strftime("%Y-%m-%d")
+    df_local = buscar_jogos_calculados_local(ligas_ids, data_formatada)
+    if not df_local.empty:
+        return df_local, ["🚀 [Modo Offline] Exibindo dados de cache local. Nenhuma requisição gasta."]
+
+    jogos = []
+    log = []
+    ano_atual = data_escolhida.year
