@@ -45,13 +45,15 @@ def inicializar_e_limpar_banco():
     try:
         conn = sqlite3.connect(NOME_BANCO)
         cursor = conn.cursor()
+        
+        # CORREÇÃO: Remoção do date('now') problemático da estrutura do banco
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS stats_times (
                 team_id INTEGER, liga_id INTEGER, season INTEGER,
                 gols_marcados_ht REAL, gols_sofridos_ht REAL,
                 gols_marcados_ft REAL, gols_sofridos_ft REAL,
                 cantos_media REAL, cartoes_media REAL,
-                data_registro DATE DEFAULT (date('now')),
+                data_registro TEXT,
                 PRIMARY KEY (team_id, liga_id, season)
             )
         ''')
@@ -60,9 +62,11 @@ def inicializar_e_limpar_banco():
                 data_jogo TEXT, liga_id INTEGER, liga_nome TEXT, confronto TEXT, hora TEXT,
                 prob_05_ht REAL, odd_ht REAL, prob_15_ft REAL, odd_15ft REAL,
                 prob_btts REAL, odd_btts REAL, prob_cantos REAL, prob_cartoes REAL,
-                data_calculo DATE DEFAULT (date('now'))
+                data_calculo TEXT
             )
         ''')
+        
+        # Filtros de limpeza calculados com segurança via Python puro
         data_limite = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
         cursor.execute("DELETE FROM stats_times WHERE data_registro < ?", (data_limite,))
         cursor.execute("DELETE FROM historico_partidas WHERE data_calculo < ?", (data_limite,))
@@ -91,12 +95,13 @@ def salvar_stats_local(team_id, liga_id, season, stats):
     try:
         conn = sqlite3.connect(NOME_BANCO)
         cursor = conn.cursor()
+        hoje = datetime.now().strftime('%Y-%m-%d')
         cursor.execute('''
             INSERT OR REPLACE INTO stats_times 
             (team_id, liga_id, season, gols_marcados_ht, gols_sofridos_ht, gols_marcados_ft, gols_sofridos_ft, cantos_media, cartoes_media, data_registro)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (team_id, liga_id, season, stats['gols_marcados_ht'], stats['gols_sofridos_ht'], 
-              stats['gols_marcados_ft'], stats['gols_sofridos_ft'], stats['cantos_media'], stats['cartoes_media']))
+              stats['gols_marcados_ft'], stats['gols_sofridos_ft'], stats['cantos_media'], stats['cartoes_media'], hoje))
         conn.commit()
         conn.close()
     except:
@@ -123,12 +128,13 @@ def salvar_jogos_calculados_local(jogos_lista):
     try:
         conn = sqlite3.connect(NOME_BANCO)
         cursor = conn.cursor()
+        hoje = datetime.now().strftime('%Y-%m-%d')
         for j in jogos_lista:
             cursor.execute('''
                 INSERT INTO historico_partidas 
                 (data_jogo, liga_id, liga_nome, confronto, hora, prob_05_ht, odd_ht, prob_15_ft, odd_15ft, prob_btts, odd_btts, prob_cantos, prob_cartoes, data_calculo)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'))
-            ''', (j['data_jogo'], j['liga_id'], j['Liga'], j['Confronto'], j['Hora'], j['0.5 HT (%)'], j['Odd HT'], j['1.5 FT (%)'], j['Odd 1.5FT'], j['BTTS (%)'], j['Odd BTTS'], j['Over 8.5 Cantos (%)'], j['Over 4.5 Cartões (%)']))
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (j['data_jogo'], j['liga_id'], j['Liga'], j['Confronto'], j['Hora'], j['0.5 HT (%)'], j['Odd HT'], j['1.5 FT (%)'], j['Odd 1.5FT'], j['BTTS (%)'], j['Odd BTTS'], j['Over 8.5 Cantos (%)'], j['Over 4.5 Cartões (%)'], hoje))
         conn.commit()
         conn.close()
     except:
@@ -181,9 +187,3 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     data_formatada = data_escolhida.strftime("%Y-%m-%d")
     df_local = buscar_jogos_calculados_local(ligas_ids, data_formatada)
     if not df_local.empty:
-        return df_local, ["🚀 [Modo Offline] Exibindo dados de cache local. Nenhuma requisição gasta."]
-
-    jogos = []
-    log = []
-    ano_atual = data_escolhida.year
-    temporadas_para_buscar = [ano_atual, ano_atual - 1]
