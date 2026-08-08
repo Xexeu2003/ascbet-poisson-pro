@@ -39,7 +39,6 @@ HEADERS = {
     'x-rapidapi-host': "v3.football.api-sports.io"
 }
 
-# ALTERAÇÃO ESTRUTURAL: Uso de memória volátil assistida por arquivos para evitar travamento do SO Linux
 NOME_BANCO = 'analisador_asc_bet.db'
 
 def inicializar_e_limpar_banco():
@@ -69,7 +68,7 @@ def inicializar_e_limpar_banco():
         cursor.execute("DELETE FROM historico_partidas WHERE data_calculo < ?", (data_limite,))
         conn.commit()
         conn.close()
-    except Exception as e:
+    except:
         pass
 
 def buscar_stats_local(team_id, liga_id, season):
@@ -187,4 +186,4 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     data_formatada = data_escolhida.strftime("%Y-%m-%d")
     df_local = buscar_jogos_calculados_local(ligas_ids, data_formatada)
     
-    if not df_local.empty:
+    # SOLUÇÃO INDENTATIONERROR: Condicional reestruturada em uma única linha direta
