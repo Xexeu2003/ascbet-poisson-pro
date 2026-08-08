@@ -194,3 +194,4 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
         return df_local, ["🚀 [Modo Offline] Exibindo dados de cache local. Nenhuma requisição gasta."]
 
     jogos = []
+    log = []
