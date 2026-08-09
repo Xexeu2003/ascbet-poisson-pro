@@ -90,11 +90,6 @@ def salvar_jogos_calculados_local(jogos_lista):
 
 inicializar_e_limpar_banco()
 
-def calcular_probabilidades_poisson(lambda_casa, lambda_fora):
-    prob_over_15 = (1 - (poisson.pmf(0, lambda_casa + lambda_fora) + poisson.pmf(1, lambda_casa + lambda_fora))) * 100
-    prob_btts = (1 - poisson.pmf(0, lambda_casa)) * (1 - poisson.pmf(0, lambda_fora)) * 100
-    return round(prob_over_15, 1), round(prob_btts, 1)
-
 def obter_estatisticas_time_filtrado(liga_id, season, team_id):
     dados_locais = buscar_stats_local(team_id, liga_id, season)
     if dados_locais: return dados_locais
@@ -130,5 +125,15 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
                             id_c, id_f = f['teams']['home']['id'], f['teams']['away']['id']
                             dt = datetime.fromisoformat(f['fixture']['date'].replace('Z',''))
                             s_c, s_f = obter_estatisticas_time_filtrado(liga_id, season_temp, id_c), obter_estatisticas_time_filtrado(liga_id, season_temp, id_f)
-                            p_over_15, p_btts = calcular_probabilidades_poisson((s_c['gols_marcados_ft'] + s_f['gols_sofridos_ft'])/2, (s_f['gols_marcados_ft'] + s_c['gols_sofridos_ft'])/2)
-                            p_ht = round((1 - poisson.pmf(0, (s_c['gols_marcados_ht'] + s_f['gols_sofridos_ht'])/2 + (s_f['gols_marcados_ht'] + s_c['gols_sofridos_ht'])/2)) * 100, 1)
+                            
+                            # CÁLCULOS MATEMÁTICOS DE INFERÊNCIA CRUZADA (POISSON)
+                            lambda_ft_c = (s_c['gols_marcados_ft'] + s_f['gols_sofridos_ft']) / 2
+                            lambda_ft_f = (s_f['gols_marcados_ft'] + s_c['gols_sofridos_ft']) / 2
+                            lambda_ht_total = ((s_c['gols_marcados_ht'] + s_f['gols_sofridos_ht']) / 2) + ((s_f['gols_marcados_ht'] + s_c['gols_sofridos_ht']) / 2)
+                            
+                            p_over_15 = round((1 - (poisson.pmf(0, lambda_ft_c + lambda_ft_f) + poisson.pmf(1, lambda_ft_c + lambda_ft_f))) * 100, 1)
+                            p_btts = round(((1 - poisson.pmf(0, lambda_ft_c)) * (1 - poisson.pmf(0, lambda_ft_f))) * 100, 1)
+                            p_ht = round((1 - poisson.pmf(0, lambda_ht_total)) * 100, 1)
+                            
+                            jogos.append({
+                                "data_jogo": data_formatada, "liga_id": liga_id, "Data": dt.strftime("%d/%m"), "Liga": LIGAS[liga_id], 
