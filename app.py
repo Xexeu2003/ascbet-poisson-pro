@@ -17,10 +17,10 @@ LIGAS = {
     253: "EUA: Major League Soccer (MLS)", 262: "MÉXICO: Liga MX"
 }
 
-# CORREÇÃO CRÍTICA: Host atualizado para validar os acessos do plano gratuito correto
+# CORREÇÃO DEFINITIVA: Cabeçalhos exatos exigidos pelo plano Free da RapidAPI
 HEADERS = {
-    'x-rapidapi-key': API_FOOTBALL_KEY if API_FOOTBALL_KEY else "",
-    'x-rapidapi-host': "api-football-v1.p.rapidapi.io"
+    'X-RapidAPI-Key': API_FOOTBALL_KEY if API_FOOTBALL_KEY else "",
+    'X-RapidAPI-Host': "api-football-v1.p.rapidapi.io"
 }
 
 if 'db_conn' not in st.session_state:
