@@ -31,7 +31,6 @@ if 'db_conn' not in st.session_state:
 
 def obter_estatisticas_time_filtrado(liga_id, season, team_id):
     try:
-        # ENDPOINT COMPLETO ATUALIZADO
         url_stats = "https://rapidapi.io"
         r = requests.get(url_stats, headers=HEADERS, params={'league': liga_id, 'season': season, 'team': team_id})
         if r.status_code == 200:
@@ -57,9 +56,9 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     url_fixtures = "https://rapidapi.io"
     
     for liga_id in ligas_ids:
-        for season_temp in [ano_atual,年には, ano_atual - 1]:
+        # CORREÇÃO CRÍTICA: Lista limpa e padronizada apenas com os anos das temporadas
+        for season_temp in [ano_atual, ano_atual - 1]:
             try:
-                # REQUISIÇÃO COM LINK COMPLETO SEM VARIÁVEL OCULTA
                 r = requests.get(url_fixtures, headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
                 if r.status_code == 200:
                     fixtures = r.json().get('response', [])
