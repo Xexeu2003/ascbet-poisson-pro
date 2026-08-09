@@ -9,8 +9,10 @@ from scipy.stats import poisson
 
 st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide")
 
+# PROTEÇÃO AVANÇADA: st.secrets.get() evita que o Streamlit quebre se o arquivo de secrets não existir
 API_FOOTBALL_KEY = st.secrets.get("API_KEY", None)
 
+# Mapeamento Estruturado das Ligas Oficiais
 LIGAS = {
     71: "BRASIL: Série A", 72: "BRASIL: Série B", 73: "BRASIL: Série C",
     39: "INGLATERRA: Premier League", 40: "INGLATERRA: EFL Championship", 41: "INGLATERRA: EFL League One", 42: "INGLATERRA: EFL League Two",
@@ -55,7 +57,7 @@ def buscar_stats_local(team_id, liga_id, season):
         cursor.execute('SELECT gols_marcados_ht, gols_sofridos_ht, gols_marcados_ft, gols_sofridos_ft, cantos_media, cartoes_media FROM stats_times WHERE team_id=? AND liga_id=? AND season=?', (team_id, liga_id, season))
         row = cursor.fetchone()
         conn.close()
-        if row: return {'gols_marcados_ht': row, 'gols_sofridos_ht': row, 'gols_marcados_ft': row, 'gols_sofridos_ft': row, 'cantos_media': row, 'cartoes_media': row}
+        if row: return {'gols_marcados_ht': row[0], 'gols_sofridos_ht': row[1], 'gols_marcados_ft': row[2], 'gols_sofridos_ft': row[3], 'cantos_media': row[4], 'cartoes_media': row[5]}
     except: pass
     return None
 
@@ -122,7 +124,6 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     
     for liga_id in ligas_ids:
         for season_temp in [data_escolhida.year, data_escolhida.year - 1]:
-            # CORREÇÃO DEFINITIVA: Remoção do try/except redundante para alinhar o fluxo
             r = requests.get("https://api-sports.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
             if r.status_code == 200:
                 fixtures = r.json().get('response', [])
@@ -138,4 +139,3 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
                         lambda_ht_total = ((s_c['gols_marcados_ht'] + s_f['gols_sofridos_ht']) / 2) + ((s_f['gols_marcados_ht'] + s_c['gols_sofridos_ht']) / 2)
                         
                         p_over_15 = round((1 - (poisson.pmf(0, lambda_ft_c + lambda_ft_f) + poisson.pmf(1, lambda_ft_c + lambda_ft_f))) * 100, 1)
-                        p_btts = round(((1 - poisson.pmf(0, lambda_ft_c)) * (1 - poisson.pmf(0, lambda_ft_f))) * 100, 1)
