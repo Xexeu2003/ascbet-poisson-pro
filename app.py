@@ -31,8 +31,8 @@ if 'db_conn' not in st.session_state:
 
 def obter_estatisticas_time_filtrado(liga_id, season, team_id):
     try:
-        url_stats = "https://rapidapi.io"
-        r = requests.get(url_stats, headers=HEADERS, params={'league': liga_id, 'season': season, 'team': team_id})
+        # LINK DIRETO DA API SEM VARIÁVEIS OCULTAS
+        r = requests.get("https://rapidapi.io", headers=HEADERS, params={'league': liga_id, 'season': season, 'team': team_id})
         if r.status_code == 200:
             res = r.json().get('response', {})
             gols = res.get('goals', {})
@@ -53,12 +53,12 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
         return pd.DataFrame(), ["⚠️ Chave de API ausente nos Secrets."]
         
     ano_atual = data_escolhida.year
-    url_fixtures = "https://rapidapi.io"
     
     for liga_id in ligas_ids:
         for season_temp in [ano_atual, ano_atual - 1]:
             try:
-                r = requests.get(url_fixtures, headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
+                # LINK DIRETO DA API PARA EVITAR ERROS DE DIGITAÇÃO DE HOST NO LINUX
+                r = requests.get("https://rapidapi.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
                 if r.status_code == 200:
                     fixtures = r.json().get('response', [])
                     if len(fixtures) > 0:
@@ -112,6 +112,7 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
                 
     return pd.DataFrame(jogos), log
 
+# --- INTERFACE VISUAL ---
 st.title("Analisador Profissional asc.bet - Cobertura Global")
 
 tab1, tab2 = st.tabs(["🔮 Projeções e Odds Justas", "🧪 Painel de Backtesting"])
@@ -124,9 +125,9 @@ with tab1:
         
     if st.button("📊 PRECIFICAR JOGOS", type="primary"):
         if not ligas_selecionadas:
-            st.warning("Selecione au menos uma liga para iniciar a precificação.")
+            st.warning("Selecione ao menos uma liga para iniciar a precificação.")
         else:
-            with st.spinner("Conectando aos servidores da RapidAPI e aplicando Poisson..."):
+            with st.spinner("Conectando aos servidores e aplicando Poisson..."):
                 df_res, logs_sistema = buscar_jogos_e_projetar(ligas_selecionadas, data_escolhida)
                 if df_res.empty:
                     st.info("Nenhum confronto localizado na API para os filtros aplicados.")
