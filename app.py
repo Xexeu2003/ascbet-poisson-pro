@@ -31,8 +31,9 @@ if 'db_conn' not in st.session_state:
 
 def obter_estatisticas_time_filtrado(liga_id, season, team_id):
     try:
-        # CORREÇÃO CRÍTICA: URL de conexão oficial para estatísticas por time
-        r = requests.get("https://rapidapi.io", headers=HEADERS, params={'league': liga_id, 'season': season, 'team': team_id})
+        # ENDPOINT COMPLETO ATUALIZADO
+        url_stats = "https://rapidapi.io"
+        r = requests.get(url_stats, headers=HEADERS, params={'league': liga_id, 'season': season, 'team': team_id})
         if r.status_code == 200:
             res = r.json().get('response', {})
             gols = res.get('goals', {})
@@ -53,12 +54,13 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
         return pd.DataFrame(), ["⚠️ Chave de API ausente nos Secrets."]
         
     ano_atual = data_escolhida.year
+    url_fixtures = "https://rapidapi.io"
     
     for liga_id in ligas_ids:
-        for season_temp in [ano_atual, ano_atual - 1]:
+        for season_temp in [ano_atual,年には, ano_atual - 1]:
             try:
-                # CORREÇÃO CRÍTICA: URL de conexão oficial para listagem de partidas do dia
-                r = requests.get("https://rapidapi.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
+                # REQUISIÇÃO COM LINK COMPLETO SEM VARIÁVEL OCULTA
+                r = requests.get(url_fixtures, headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
                 if r.status_code == 200:
                     fixtures = r.json().get('response', [])
                     if len(fixtures) > 0:
@@ -107,7 +109,7 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
                     else:
                         log.append(f"ℹ️ Sem jogos ativos para a liga {LIGAS[liga_id]} em {season_temp}")
             except Exception as e:
-                log.append(f"❌ Erro na liga {liga_id}: {str(e)}")
+                log.append(f"❌ Erro de conexão na liga {liga_id}: {str(e)}")
                 continue
                 
     return pd.DataFrame(jogos), log
