@@ -55,7 +55,7 @@ def buscar_stats_local(team_id, liga_id, season):
         cursor.execute('SELECT gols_marcados_ht, gols_sofridos_ht, gols_marcados_ft, gols_sofridos_ft, cantos_media, cartoes_media FROM stats_times WHERE team_id=? AND liga_id=? AND season=?', (team_id, liga_id, season))
         row = cursor.fetchone()
         conn.close()
-        if row: return {'gols_marcados_ht': row[0], 'gols_sofridos_ht': row[1], 'gols_marcados_ft': row[2], 'gols_sofridos_ft': row[3], 'cantos_media': row[4], 'cartoes_media': row[5]}
+        if row: return {'gols_marcados_ht': row, 'gols_sofridos_ht': row, 'gols_marcados_ft': row, 'gols_sofridos_ft': row, 'cantos_media': row, 'cartoes_media': row}
     except: pass
     return None
 
@@ -116,24 +116,26 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     data_formatada = data_escolhida.strftime("%Y-%m-%d")
     df_local = buscar_jogos_calculados_local(ligas_ids, data_formatada)
     if not df_local.empty: return df_local, ["🚀 Exibindo dados de cache local."]
+    
     jogos, log = [], []
     if not API_FOOTBALL_KEY: return pd.DataFrame(), ["⚠️ Insira a chave nos Secrets."]
+    
     for liga_id in ligas_ids:
         for season_temp in [data_escolhida.year, data_escolhida.year - 1]:
-            try:
-                r = requests.get("https://api-sports.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
-                if r.status_code == 200:
-                    fixtures = r.json().get('response', [])
-                    if len(fixtures) > 0:
-                        log.append(f"✅ Encontrados {len(fixtures)} jogos")
-                        for f in fixtures:
-                            id_c, id_f = f['teams']['home']['id'], f['teams']['away']['id']
-                            dt = datetime.fromisoformat(f['fixture']['date'].replace('Z',''))
-                            s_c, s_f = obter_estatisticas_time_filtrado(liga_id, season_temp, id_c), obter_estatisticas_time_filtrado(liga_id, season_temp, id_f)
-                            
-                            lambda_ft_c = (s_c['gols_marcados_ft'] + s_f['gols_sofridos_ft']) / 2
-                            lambda_ft_f = (s_f['gols_marcados_ft'] + s_c['gols_sofridos_ft']) / 2
-                            lambda_ht_total = ((s_c['gols_marcados_ht'] + s_f['gols_sofridos_ht']) / 2) + ((s_f['gols_marcados_ht'] + s_c['gols_sofridos_ht']) / 2)
-                            
-                            p_over_15 = round((1 - (poisson.pmf(0, lambda_ft_c + lambda_ft_f) + poisson.pmf(1, lambda_ft_c + lambda_ft_f))) * 100, 1)
-                            p_btts = round(((1 - poisson.pmf(0, lambda_ft_c)) * (1 - poisson.pmf(0, lambda_ft_f))) * 100, 1)
+            # CORREÇÃO DEFINITIVA: Remoção do try/except redundante para alinhar o fluxo
+            r = requests.get("https://api-sports.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
+            if r.status_code == 200:
+                fixtures = r.json().get('response', [])
+                if len(fixtures) > 0:
+                    log.append(f"✅ Encontrados {len(fixtures)} jogos")
+                    for f in fixtures:
+                        id_c, id_f = f['teams']['home']['id'], f['teams']['away']['id']
+                        dt = datetime.fromisoformat(f['fixture']['date'].replace('Z',''))
+                        s_c, s_f = obter_estatisticas_time_filtrado(liga_id, season_temp, id_c), obter_estatisticas_time_filtrado(liga_id, season_temp, id_f)
+                        
+                        lambda_ft_c = (s_c['gols_marcados_ft'] + s_f['gols_sofridos_ft']) / 2
+                        lambda_ft_f = (s_f['gols_marcados_ft'] + s_c['gols_sofridos_ft']) / 2
+                        lambda_ht_total = ((s_c['gols_marcados_ht'] + s_f['gols_sofridos_ht']) / 2) + ((s_f['gols_marcados_ht'] + s_c['gols_sofridos_ht']) / 2)
+                        
+                        p_over_15 = round((1 - (poisson.pmf(0, lambda_ft_c + lambda_ft_f) + poisson.pmf(1, lambda_ft_c + lambda_ft_f))) * 100, 1)
+                        p_btts = round(((1 - poisson.pmf(0, lambda_ft_c)) * (1 - poisson.pmf(0, lambda_ft_f))) * 100, 1)
