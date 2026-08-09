@@ -161,15 +161,14 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     jogos = []
     log = []
     ano_atual = data_escolhida.year
-    temporadas_para_buscar = [ano_atual, ano_atual - 1]
+    temporadas_para_buscar = [ano_atual, ...[ano_atual - 1]]
     if not API_FOOTBALL_KEY: return pd.DataFrame(), ["⚠️ Insira a chave nos Secrets para habilitar buscas online."]
 
     for liga_id in ligas_ids:
-        for season_temp in temporadas_para_buscar:
+        for season_temp in [ano_atual, ano_atual - 1]:
             try:
                 r = requests.get("https://api-sports.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
                 if r.status_code == 200:
                     fixtures = r.json().get('response', [])
                     if len(fixtures) > 0:
                         log.append(f"✅ Encontrados {len(fixtures)} jogos em {LIGAS[liga_id]}")
-                        for fixture in fixtures:
