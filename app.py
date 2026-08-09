@@ -33,8 +33,8 @@ LIGAS = {
 }
 
 HEADERS = {'x-apisports-key': API_FOOTBALL_KEY if API_FOOTBALL_KEY else "", 'x-rapidapi-host': "v3.football.api-sports.io"}
+NOME_BANCO = 'analisador_asc_bet.db'
 
-# SOLUÇÃO DEFINITIVA PARA TELA BRANCA: Banco criado na RAM livre de travas de arquivos do Linux
 if 'db_conn' not in st.session_state:
     st.session_state.db_conn = sqlite3.connect(':memory:', check_same_thread=False)
     cursor = st.session_state.db_conn.cursor()
@@ -84,14 +84,17 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     data_formatada = data_escolhida.strftime("%Y-%m-%d")
     jogos, log = [], []
     if not API_FOOTBALL_KEY: return pd.DataFrame(), ["⚠️ Insira a chave nos Secrets."]
+    ano_atual = data_escolhida.year
+    
     for liga_id in ligas_ids:
-        for season_temp in [data_escolhida.year, data_escolhida.year - 1]:
+        # CORREÇÃO: Busca de temporadas simplificada e corrigida sem o "..."
+        for season_temp in [ano_atual, ano_atual - 1]:
             try:
                 r = requests.get("https://api-sports.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
                 if r.status_code == 200:
                     fixtures = r.json().get('response', [])
                     if len(fixtures) > 0:
-                        log.append(f"✅ Encontrados {len(fixtures)} jogos")
+                        log.append(f"✅ Encontrados {len(fixtures)} jogos em {LIGAS[liga_id]}")
                         for f in fixtures:
                             id_c, id_f = f['teams']['home']['id'], f['teams']['away']['id']
                             dt = datetime.fromisoformat(f['fixture']['date'].replace('Z',''))
@@ -131,4 +134,3 @@ if not API_FOOTBALL_KEY: st.info("🔑 O token `API_KEY` não está preenchido n
 tab1, tab2 = st.tabs(["🔮 Projeções e Odds Justas", "🧪 Painel de Backtesting"])
 with tab1:
     col1, col2 = st.columns(2)
-    with col1: ligas_selecionadas = st.multiselect("1. Selecione as Ligas", options=list(LIGAS.keys()), format_func=lambda x: LIGAS[x])
