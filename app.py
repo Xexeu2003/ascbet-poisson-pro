@@ -43,41 +43,46 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     data_formatada = data_escolhida.strftime("%Y-%m-%d")
     jogos = []
     if not API_FOOTBALL_KEY: return pd.DataFrame(), ["⚠️ Chave ausente."]
+    ano_atual = data_escolhida.year
     
     for liga_id in ligas_ids:
-        try:
-            r = requests.get("https://api-sports.io", headers=HEADERS, params={'league': liga_id, 'season': data_escolhida.year, 'date': data_formatada})
-            if r.status_code == 200:
-                fixtures = r.json().get('response', [])
-                for f in fixtures:
-                    id_c, id_f = f['teams']['home']['id'], f['teams']['away']['id']
-                    dt = datetime.fromisoformat(f['fixture']['date'].replace('Z',''))
-                    s_c, s_f = obter_estatisticas_time_filtrado(liga_id, data_escolhida.year, id_c), obter_estatisticas_time_filtrado(liga_id, data_escolhida.year, id_f)
-                    
-                    l_ft_c = (s_c['gols_marcados_ft'] + s_f['gols_sofridos_ft']) / 2
-                    l_ft_f = (s_f['gols_marcados_ft'] + s_c['gols_sofridos_ft']) / 2
-                    l_ht_total = ((s_c['gols_marcados_ht'] + s_f['gols_sofridos_ht']) / 2) + ((s_f['gols_marcados_ht'] + s_c['gols_sofridos_ht']) / 2)
-                    
-                    p_over_15 = round((1 - (poisson.pmf(0, l_ft_c + l_ft_f) + poisson.pmf(1, l_ft_c + l_ft_f))) * 100, 1)
-                    p_btts = round(((1 - poisson.pmf(0, l_ft_c)) * (1 - poisson.pmf(0, l_ft_f))) * 100, 1)
-                    p_ht = round((1 - poisson.pmf(0, l_ht_total)) * 100, 1)
-                    
-                    conf_nome = f"{f['teams']['home']['name']} x {f['teams']['away']['name']}"
-                    odd_h = round(100/p_ht, 2) if p_ht > 0 else 99.0
-                    odd_15 = round(100/p_over_15, 2) if p_over_15 > 0 else 99.0
-                    odd_bt = round(100/p_btts, 2) if p_btts > 0 else 99.0
-                    
-                    cursor = st.session_state.db_conn.cursor()
-                    cursor.execute('INSERT OR REPLACE INTO historico_partidas VALUES (?, ?, ?, ?)', (conf_nome, odd_h, odd_15, odd_bt))
-                    st.session_state.db_conn.commit()
-                    
-                    jogos.append({
-                        "Data": dt.strftime("%d/%m"), "Liga": LIGAS[liga_id], "Confronto": conf_nome, "Hora": dt.strftime("%H:%M"),
-                        "0.5 HT (%)": p_ht, "Odd HT": odd_h, "1.5 FT (%)": p_over_15, "Odd 1.5FT": odd_15, "BTTS (%)": p_btts, "Odd BTTS": odd_bt,
-                        "Over 8.5 Cantos (%)": round((1 - poisson.cdf(8, s_c['cantos_media'] + s_f['cantos_media'])) * 100, 1),
-                        "Over 4.5 Cartões (%)": round((1 - poisson.cdf(4, s_c['cartoes_media'] + s_f['cartoes_media'])) * 100, 1)
-                    })
-        except: continue
+        # CORREÇÃO: Varre o ano atual e o anterior de forma veloz para achar a rodada correta na API
+        for season_temp in [ano_atual, ano_atual - 1]:
+            try:
+                r = requests.get("https://api-sports.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
+                if r.status_code == 200:
+                    fixtures = r.json().get('response', [])
+                    if len(fixtures) > 0:
+                        for f in fixtures:
+                            id_c, id_f = f['teams']['home']['id'], f['teams']['away']['id']
+                            dt = datetime.fromisoformat(f['fixture']['date'].replace('Z',''))
+                            s_c, s_f = obter_estatisticas_time_filtrado(liga_id, season_temp, id_c), obter_estatisticas_time_filtrado(liga_id, season_temp, id_f)
+                            
+                            l_ft_c = (s_c['gols_marcados_ft'] + s_f['gols_sofridos_ft']) / 2
+                            l_ft_f = (s_f['gols_marcados_ft'] + s_c['gols_sofridos_ft']) / 2
+                            l_ht_total = ((s_c['gols_marcados_ht'] + s_f['gols_sofridos_ht']) / 2) + ((s_f['gols_marcados_ht'] + s_c['gols_sofridos_ht']) / 2)
+                            
+                            p_over_15 = round((1 - (poisson.pmf(0, l_ft_c + l_ft_f) + poisson.pmf(1, l_ft_c + l_ft_f))) * 100, 1)
+                            p_btts = round(((1 - poisson.pmf(0, l_ft_c)) * (1 - poisson.pmf(0, l_ft_f))) * 100, 1)
+                            p_ht = round((1 - poisson.pmf(0, l_ht_total)) * 100, 1)
+                            
+                            conf_nome = f"{f['teams']['home']['name']} x {f['teams']['away']['name']}"
+                            odd_h = round(100/p_ht, 2) if p_ht > 0 else 99.0
+                            odd_15 = round(100/p_over_15, 2) if p_over_15 > 0 else 99.0
+                            odd_bt = round(100/p_btts, 2) if p_btts > 0 else 99.0
+                            
+                            cursor = st.session_state.db_conn.cursor()
+                            cursor.execute('INSERT OR REPLACE INTO historico_partidas VALUES (?, ?, ?, ?)', (conf_nome, odd_h, odd_15, odd_bt))
+                            st.session_state.db_conn.commit()
+                            
+                            jogos.append({
+                                "Data": dt.strftime("%d/%m"), "Liga": LIGAS[liga_id], "Confronto": conf_nome, "Hora": dt.strftime("%H:%M"),
+                                "0.5 HT (%)": p_ht, "Odd HT": odd_h, "1.5 FT (%)": p_over_15, "Odd 1.5FT": odd_15, "BTTS (%)": p_btts, "Odd BTTS": odd_bt,
+                                "Over 8.5 Cantos (%)": round((1 - poisson.cdf(8, s_c['cantos_media'] + s_f['cantos_media'])) * 100, 1),
+                                "Over 4.5 Cartões (%)": round((1 - poisson.cdf(4, s_c['cartoes_media'] + s_f['cartoes_media'])) * 100, 1)
+                            })
+                        break # Encontrou partidas nesta temporada, pula a busca retroativa da mesma liga
+            except: continue
     return pd.DataFrame(jogos), []
 
 # --- RENDER DA INTERFACE GRÁFICA ---
@@ -95,9 +100,9 @@ with tab1:
         if not ligas_selecionadas:
             st.warning("Selecione ao menos uma liga.")
         else:
-            with st.spinner("Processando..."):
+            with st.spinner("Processando dados e aplicando Poisson..."):
                 df_res, _ = buscar_jogos_e_projetar(ligas_selecionadas, data_escolhida)
-                if df_res.empty: st.info("Nenhum jogo localizado.")
+                if df_res.empty: st.info("Nenhum jogo localizado para esta data.")
                 else: st.dataframe(df_res, use_container_width=True)
 
 with tab2:
