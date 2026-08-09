@@ -12,7 +12,7 @@ st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide")
 # PROTEÇÃO AVANÇADA: st.secrets.get() evita que o Streamlit quebre se o arquivo de secrets não existir
 API_FOOTBALL_KEY = st.secrets.get("API_KEY", None)
 
-# Mapeamento Compactado das Ligas Oficiais (Mais rápido para o servidor Linux ler)
+# Mapeamento Compactado das Ligas Oficiais
 LIGAS = {
     71: "BRASIL: Série A", 72: "BRASIL: Série B", 73: "BRASIL: Série C",
     39: "INGLATERRA: Premier League", 40: "INGLATERRA: EFL Championship", 41: "INGLATERRA: EFL League One", 42: "INGLATERRA: EFL League Two",
@@ -172,3 +172,4 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
                     fixtures = r.json().get('response', [])
                     if len(fixtures) > 0:
                         log.append(f"✅ Encontrados {len(fixtures)} jogos em {LIGAS[liga_id]}")
+                        for fixture in fixtures:
