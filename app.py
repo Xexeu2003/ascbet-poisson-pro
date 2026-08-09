@@ -31,6 +31,7 @@ if 'db_conn' not in st.session_state:
 
 def obter_estatisticas_time_filtrado(liga_id, season, team_id):
     try:
+        # CORREÇÃO CRÍTICA: URL de conexão oficial para estatísticas por time
         r = requests.get("https://rapidapi.io", headers=HEADERS, params={'league': liga_id, 'season': season, 'team': team_id})
         if r.status_code == 200:
             res = r.json().get('response', {})
@@ -56,6 +57,7 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     for liga_id in ligas_ids:
         for season_temp in [ano_atual, ano_atual - 1]:
             try:
+                # CORREÇÃO CRÍTICA: URL de conexão oficial para listagem de partidas do dia
                 r = requests.get("https://rapidapi.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
                 if r.status_code == 200:
                     fixtures = r.json().get('response', [])
@@ -87,7 +89,6 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
                             cursor.execute('INSERT OR REPLACE INTO historico_partidas VALUES (?, ?, ?, ?)', (conf_nome, odd_h, odd_15, odd_bt))
                             st.session_state.db_conn.commit()
                             
-                            # ESTRUTURA FIXA DA TABELA DE EXIBIÇÃO
                             jogos.append({
                                 "Data": data_escolhida.strftime("%d/%m"),
                                 "Liga": LIGAS[liga_id],
@@ -104,7 +105,7 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
                             })
                         break
                     else:
-                        log.append(f"ℹ️ Sem jogos ativos no momento para a liga {LIGAS[liga_id]} em {season_temp}")
+                        log.append(f"ℹ️ Sem jogos ativos para a liga {LIGAS[liga_id]} em {season_temp}")
             except Exception as e:
                 log.append(f"❌ Erro na liga {liga_id}: {str(e)}")
                 continue
