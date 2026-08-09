@@ -17,7 +17,11 @@ LIGAS = {
     253: "EUA: Major League Soccer (MLS)", 262: "MÉXICO: Liga MX"
 }
 
-HEADERS = {'x-apisports-key': API_FOOTBALL_KEY if API_FOOTBALL_KEY else "", 'x-rapidapi-host': "v3.football.api-sports.io"}
+# CORREÇÃO CRÍTICA: Host atualizado para validar os acessos do plano gratuito correto
+HEADERS = {
+    'x-rapidapi-key': API_FOOTBALL_KEY if API_FOOTBALL_KEY else "",
+    'x-rapidapi-host': "api-football-v1.p.rapidapi.io"
+}
 
 if 'db_conn' not in st.session_state:
     st.session_state.db_conn = sqlite3.connect(':memory:', check_same_thread=False)
@@ -30,7 +34,7 @@ def obter_estatisticas_time_filtrado(liga_id, season, team_id):
     dados_padrao = {'gols_marcados_ht': 0.6, 'gols_sofridos_ht': 0.5, 'gols_marcados_ft': 1.3, 'gols_sofridos_ft': 1.1, 'cantos_media': 5.0, 'cartoes_media': 2.2}
     if not API_FOOTBALL_KEY: return dados_padrao
     try:
-        r = requests.get("https://api-sports.io", headers=HEADERS, params={'league': liga_id, 'season': season, 'team': team_id})
+        r = requests.get("https://rapidapi.io", headers=HEADERS, params={'league': liga_id, 'season': season, 'team': team_id})
         if r.status_code != 200: return dados_padrao
         res = r.json().get('response', {})
         gols = res.get('goals', {})
@@ -46,10 +50,9 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
     ano_atual = data_escolhida.year
     
     for liga_id in ligas_ids:
-        # CORREÇÃO: Varre o ano atual e o anterior de forma veloz para achar a rodada correta na API
         for season_temp in [ano_atual, ano_atual - 1]:
             try:
-                r = requests.get("https://api-sports.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
+                r = requests.get("https://rapidapi.io", headers=HEADERS, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
                 if r.status_code == 200:
                     fixtures = r.json().get('response', [])
                     if len(fixtures) > 0:
@@ -81,24 +84,20 @@ def buscar_jogos_e_projetar(ligas_ids, data_escolhida):
                                 "Over 8.5 Cantos (%)": round((1 - poisson.cdf(8, s_c['cantos_media'] + s_f['cantos_media'])) * 100, 1),
                                 "Over 4.5 Cartões (%)": round((1 - poisson.cdf(4, s_c['cartoes_media'] + s_f['cartoes_media'])) * 100, 1)
                             })
-                        break # Encontrou partidas nesta temporada, pula a busca retroativa da mesma liga
+                        break
             except: continue
     return pd.DataFrame(jogos), []
 
-# --- RENDER DA INTERFACE GRÁFICA ---
 st.title("Analisador Profissional asc.bet - Cobertura Global")
 
 tab1, tab2 = st.tabs(["🔮 Projeções e Odds Justas", "🧪 Painel de Backtesting"])
 with tab1:
     col1, col2 = st.columns(2)
-    with col1:
-        ligas_selecionadas = st.multiselect("1. Selecione as Ligas", options=list(LIGAS.keys()), format_func=lambda x: LIGAS[x])
-    with col2:
-        data_escolhida = st.date_input("2. Data da Rodada", datetime.now())
+    with col1: ligas_selecionadas = st.multiselect("1. Selecione as Ligas", options=list(LIGAS.keys()), format_func=lambda x: LIGAS[x])
+    with col2: data_escolhida = st.date_input("2. Data da Rodada", datetime.now())
         
     if st.button("📊 PRECIFICAR JOGOS", type="primary"):
-        if not ligas_selecionadas:
-            st.warning("Selecione ao menos uma liga.")
+        if not ligas_selecionadas: st.warning("Selecione ao menos uma liga.")
         else:
             with st.spinner("Processando dados e aplicando Poisson..."):
                 df_res, _ = buscar_jogos_e_projetar(ligas_selecionadas, data_escolhida)
