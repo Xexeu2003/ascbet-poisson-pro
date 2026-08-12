@@ -9,7 +9,7 @@ from scipy.stats import poisson
 # Configuração da página do Streamlit
 st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide", page_icon="📊")
 
-# --- GERENCIAMENTO DE CHAVE DA API (DASHBOARD.API-FOOTBALL.COM PRO) ---
+# --- GERENCIAMENTO DE CHAVE DA API (://api-football.com PRO) ---
 st.sidebar.title("Configurações de Acesso PRO")
 chave_padrao = st.secrets.get("API_KEY", "")
 API_FOOTBALL_KEY = st.sidebar.text_input("Sua Chave API-Football PRO:", value=chave_padrao, type="password")
@@ -116,31 +116,22 @@ def obter_estatisticas_time_filtrado(liga_id, season, team_id, _headers):
     return {'gols_m': 1.3, 'gols_s': 1.1, 'cantos': 5.0, 'cartoes': 2.2}
 
 def calcular_probabilidades_poisson(s_c, s_f):
-    # Expectativa de gols calculada com base no cruzamento das médias
     l_ft_c = (s_c['gols_m'] + s_f['gols_s']) / 2
     l_ft_f = (s_f['gols_m'] + s_c['gols_s']) / 2
     l_ht_total = (l_ft_c * 0.45) + (l_ft_f * 0.45)
     
-    # 0.5 Gols HT
     p_ht = round((1 - poisson.pmf(0, l_ht_total)) * 100, 1)
-    
-    # 1.5 Gols FT
     p_over_15 = round((1 - (poisson.pmf(0, l_ft_c + l_ft_f) + poisson.pmf(1, l_ft_c + l_ft_f))) * 100, 1)
     
-    # 2.5 Gols FT
     prob_0_gols = poisson.pmf(0, l_ft_c + l_ft_f)
     prob_1_gol = poisson.pmf(1, l_ft_c + l_ft_f)
     prob_2_gols = poisson.pmf(2, l_ft_c + l_ft_f)
     p_over_25 = round((1 - (prob_0_gols + prob_1_gol + prob_2_gols)) * 100, 1)
     
-    # BTTS (Ambas Marcam)
     p_btts = round(((1 - poisson.pmf(0, l_ft_c)) * (1 - poisson.pmf(0, l_ft_f))) * 100, 1)
-    
-    # Cantos e Cartões (Modelagem de Distribuição Cumulativa)
     p_cantos_85 = round((1 - poisson.cdf(8, s_c['cantos'] + s_f['cantos'])) * 100, 1)
     p_cartoes_45 = round((1 - poisson.cdf(4, s_c['cartoes'] + s_f['cartoes'])) * 100, 1)
     
-    # Geração automatizada de Odds Justas
     odd_ht = round(100/p_ht, 2) if p_ht > 0 else 99.0
     odd_15 = round(100/p_over_15, 2) if p_over_15 > 0 else 99.0
     odd_25 = round(100/p_over_25, 2) if p_over_25 > 0 else 99.0
@@ -208,7 +199,6 @@ st.title("Analisador Profissional asc.bet - Cobertura Global")
 if not API_FOOTBALL_KEY:
     st.error("🚨 Chave de API ausente ou inválida. Insira sua chave PRO na barra lateral esquerda para ativar o app.")
 else:
-    # Criação das abas, separando a análise individual conforme solicitado
     tab_individual, tab_multiplas, tab_backtest = st.tabs([
         "🔬 Análise Individual (Uma Liga por Vez)", 
         "🔮 Projeções em Massa (Várias Ligas)", 
@@ -220,7 +210,6 @@ else:
         st.subheader("Análise Avançada e Cirúrgica por Competição")
         col1, col2 = st.columns(2)
         with col1:
-            # Ordenando as chaves para facilitar a visualização no selectbox
             liga_unica = st.selectbox(
                 "Selecione a Liga Desejada", 
                 options=sorted(list(LIGAS.keys()), key=lambda x: LIGAS[x]), 
@@ -236,3 +225,10 @@ else:
                 if df_liga.empty:
                     st.info(f"Sem partidas ativas localizadas para {LIGAS[liga_unica]} nesta data.")
                 else:
+                    st.success(f"Sucesso! {len(df_liga)} partidas encontradas.")
+                    st.dataframe(df_liga, use_container_width=True)
+                    
+                    st.markdown("### 🔥 Insights Rápidos da Rodada")
+                    col_ht, col_ft, col_btts = st.columns(3)
+                    
+                    top_ht = df_liga.sort_values(by="0.5 HT (%)", ascending=False).iloc[0]
