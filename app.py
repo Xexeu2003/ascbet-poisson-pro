@@ -233,3 +233,4 @@ else:
                     
                     try:
                         top_ht = df_liga.sort_values(by="0.5 HT (%)", ascending=False).iloc[0]
+
