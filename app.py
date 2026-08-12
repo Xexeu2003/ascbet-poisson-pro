@@ -9,12 +9,12 @@ from scipy.stats import poisson
 # Configuração da página do Streamlit
 st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide", page_icon="📊")
 
-# --- GERENCIAMENTO DE CHAVE DA API (://api-football.com PRO) ---
+# --- GERENCIAMENTO DE CHAVE DA API PRO CORRETA ---
 st.sidebar.title("Configurações de Acesso PRO")
 chave_padrao = st.secrets.get("API_KEY", "")
 API_FOOTBALL_KEY = st.sidebar.text_input("Sua Chave API-Football PRO:", value=chave_padrao, type="password")
 
-# DICIONÁRIO EXPANDIDO COM TODAS AS LIGAS SOLICITADAS (IDs OFICIAIS API-FOOTBALL)
+# DICIONÁRIO EXPANDIDO COM TODAS AS LIGAS SOLICITADAS
 LIGAS = {
     # Brasil
     71: "BRASIL: Série A", 
@@ -78,9 +78,9 @@ LIGAS = {
     308: "ARÁBIA SAUDITA: Yelo League (1st Div)"
 }
 
+# Cabeçalhos ajustados para o Servidor de Produção PRO Direto
 HEADERS = {
-    'X-RapidAPI-Key': API_FOOTBALL_KEY,
-    'X-RapidAPI-Host': "api-football-v1.p.rapidapi.io"
+    'x-apisports-key': API_FOOTBALL_KEY
 }
 
 # --- BANCO DE DADOS LOCAL ---
@@ -95,7 +95,8 @@ if 'db_conn' not in st.session_state:
 @st.cache_data(ttl=86400)
 def obter_estatisticas_time_filtrado(liga_id, season, team_id, _headers):
     try:
-        url = "https://rapidapi.io"
+        # URL Endpoint correta para servidores estáveis PRO
+        url = "https://api-sports.io"
         r = requests.get(url, headers=_headers, params={'league': liga_id, 'season': season, 'team': team_id})
         if r.status_code == 200:
             res = r.json().get('response', {})
@@ -153,7 +154,8 @@ def processar_jogos_da_liga(liga_id, data_escolhida, headers):
     
     for season_temp in [ano_atual, ano_atual - 1]:
         try:
-            url = "https://rapidapi.io"
+            # URL Endpoint correta para servidores estáveis PRO
+            url = "https://api-sports.io"
             r = requests.get(url, headers=headers, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
             
             if r.status_code == 200:
@@ -231,4 +233,5 @@ else:
                     st.markdown("### 🔥 Insights Rápidos da Rodada")
                     col_ht, col_ft, col_btts = st.columns(3)
                     
-                    top_ht = df_liga.sort_values(by="0.5 HT (%)", ascending=False).iloc[0]
+                    try:
+
