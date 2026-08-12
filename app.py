@@ -95,7 +95,6 @@ if 'db_conn' not in st.session_state:
 @st.cache_data(ttl=86400)
 def obter_estatisticas_time_filtrado(liga_id, season, team_id, _headers):
     try:
-        # URL Endpoint correta para servidores estáveis PRO
         url = "https://api-sports.io"
         r = requests.get(url, headers=_headers, params={'league': liga_id, 'season': season, 'team': team_id})
         if r.status_code == 200:
@@ -154,7 +153,6 @@ def processar_jogos_da_liga(liga_id, data_escolhida, headers):
     
     for season_temp in [ano_atual, ano_atual - 1]:
         try:
-            # URL Endpoint correta para servidores estáveis PRO
             url = "https://api-sports.io"
             r = requests.get(url, headers=headers, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
             
@@ -234,4 +232,4 @@ else:
                     col_ht, col_ft, col_btts = st.columns(3)
                     
                     try:
-
+                        top_ht = df_liga.sort_values(by="0.5 HT (%)", ascending=False).iloc[0]
