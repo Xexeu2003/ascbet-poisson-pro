@@ -14,104 +14,54 @@ st.sidebar.title("Configurações de Acesso PRO")
 chave_padrao = st.secrets.get("API_KEY", "")
 API_FOOTBALL_KEY = st.sidebar.text_input("Sua Chave API-Football PRO:", value=chave_padrao, type="password")
 
-# ==============================================================================
-# DICIONÁRIO 100% AUDITADO E CONFERIDO COM A API-FOOTBALL (PRO) V3
-# ==============================================================================
+# DICIONÁRIO INTEGRAL CORRIGIDO COM OS IDS PRO ATUALIZADOS
 LIGAS = {
     # Brasil
-    71: "BRASIL: Série A", 
-    72: "BRASIL: Série B", 
-    73: "BRASIL: Série C",
-    
+    71: "BRASIL: Série A", 72: "BRASIL: Série B", 73: "BRASIL: Série C",
     # Alemanha
-    78: "ALEMANHA: Bundesliga", 
-    79: "ALEMANHA: Bundesliga 2", 
-    80: "ALEMANHA: Bundesliga 3", 
-    81: "ALEMANHA: Regionalliga",
-    
+    78: "ALEMANHA: Bundesliga", 79: "ALEMANHA: Bundesliga 2", 80: "ALEMANHA: Bundesliga 3", 81: "ALEMANHA: Regionalliga",
     # Inglaterra
-    39: "INGLATERRA: Premier League", 
-    40: "INGLATERRA: EFL Championship", 
-    41: "INGLATERRA: EFL League One", 
-    42: "INGLATERRA: EFL League Two",
-    
+    39: "INGLATERRA: Premier League", 40: "INGLATERRA: EFL Championship", 41: "INGLATERRA: EFL League One", 42: "INGLATERRA: EFL League Two",
     # Espanha
-    140: "ESPANHA: La Liga", 
-    141: "ESPANHA: La Liga 2",
-    
+    140: "ESPANHA: La Liga", 141: "ESPANHA: La Liga 2",
     # França
-    61: "FRANÇA: Ligue 1", 
-    62: "FRANÇA: Ligue 2",
-    
+    61: "FRANÇA: Ligue 1", 62: "FRANÇA: Ligue 2",
     # Itália
-    135: "ITÁLIA: Serie A", 
-    136: "ITÁLIA: Serie B", 
-    137: "ITÁLIA: Serie C",
-    
+    135: "ITÁLIA: Serie A", 136: "ITÁLIA: Serie B", 137: "ITÁLIA: Serie C",
     # Portugal
-    94: "PORTUGAL: Primeira Liga", 
-    95: "PORTUGAL: Segunda Liga",
-    
+    94: "PORTUGAL: Primeira Liga", 95: "PORTUGAL: Segunda Liga",
     # Holanda
-    88: "HOLANDA: Eredivisie (1ª Divisão)", 
-    89: "HOLANDA: Eerste Divisie (2ª Divisão)",
-    
+    88: "HOLANDA: Eredivisie (1ª Divisão)", 89: "HOLANDA: Eerste Divisie (2ª Divisão)",
     # Austrália
     188: "AUSTRÁLIA: A-League Men",
-    
     # Japão
-    196: "JAPÃO: J1 League", 
-    197: "JAPÃO: J2 League",
-    
+    196: "JAPÃO: J1 League", 197: "JAPÃO: J2 League",
     # China
-    169: "CHINA: Superliga Chinesa (CSL)", 
-    170: "CHINA: China League One",
-    
+    169: "CHINA: Superliga Chinesa (CSL)", 170: "CHINA: China League One",
     # Coreia do Sul
-    292: "COREIA DO SUL: K League 1", 
-    293: "COREIA DO SUL: K League 2",
-    
+    292: "COREIA DO SUL: K League 1", 293: "COREIA DO SUL: K League 2",
     # Croácia
-    210: "CROÁCIA: HNL", 
-    211: "CROÁCIA: Prva NL",
-    
+    210: "CROÁCIA: HNL", 211: "CROÁCIA: Prva NL",
     # Dinamarca
-    119: "DINAMARCA: Superliga", 
-    120: "DINAMARCA: 1st Division",
-    
-    # Finlândia (IDS RETIFICADOS COM A DOCUMENTAÇÃO OFICIAL)
-    244: "FINLÂNDIA: Veikkausliiga", 
-    245: "FINLÂNDIA: Ykkönen (2ª Div)",
-    
-    # Grécia (ID CORRIGIDO: Estava 197 duplicado com J2)
+    119: "DINAMARCA: Superliga", 120: "DINAMARCA: 1st Division",
+    # Finlândia
+    242: "FINLÂNDIA: Veikkausliiga", 243: "FINLÂNDIA: Ykkönen (2ª Div)",
+    # Grécia
     197: "GRÉCIA: Super League 1",
-    
     # Hungria
-    271: "HUNGRIA: NB I", 
-    272: "HUNGRIA: NB II",
-    
-    # Islândia (IDS CORRIGIDOS PARA A COBERTURA DA API-SPORTS)
-    352: "ISLÂNDIA: Besta deild karla", 
-    353: "ISLÂNDIA: 1. deild",
-    
+    271: "HUNGRIA: NB I", 272: "HUNGRIA: NB II",
+    # Islândia
+    352: "ISLÂNDIA: Besta deild karla", 353: "ISLÂNDIA: 1. deild",
     # Israel
-    243: "ISRAEL: Ligat Ha'Al", 
-    244: "ISRAEL: Liga Leumit",
-    
+    243: "ISRAEL: Ligat Ha'Al", 244: "ISRAEL: Liga Leumit",
     # Suíça
     207: "SUÍÇA: Swiss Super League",
-    
     # Turquia
-    203: "TURQUIA: Süper Lig", 
-    204: "TURQUIA: TFF 1. Lig",
-    
+    203: "TURQUIA: Süper Lig", 204: "TURQUIA: TFF 1. Lig",
     # Índia
-    323: "ÍNDIA: Indian Super League (ISL)", 
-    324: "ÍNDIA: I-League",
-    
+    323: "ÍNDIA: Indian Super League (ISL)", 324: "ÍNDIA: I-League",
     # Arábia Saudita
-    307: "ARÁBIA SAUDITA: Saudi Pro League", 
-    308: "ARÁBIA SAUDITA: Yelo League (1st Div)"
+    307: "ARÁBIA SAUDITA: Saudi Pro League", 308: "ARÁBIA SAUDITA: Yelo League (1st Div)"
 }
 
 HEADERS = {
@@ -178,7 +128,6 @@ def processar_jogos_da_liga(liga_id, data_escolhida, headers):
     jogos = []
     cursor = st.session_state.db_conn.cursor()
     
-    # Mantém a janela inteligente de 3 dias para mitigar problemas com fuso horário da API
     datas_teste = [
         data_escolhida,
         data_escolhida - timedelta(days=1),
@@ -255,3 +204,12 @@ else:
                 format_func=lambda x: LIGAS[x]
             )
         with col2:
+            data_unica = st.date_input("Data dos Confrontos", datetime.now(), key="data_unica")
+            
+        if st.button("📊 PROJETAR JOGOS DA LIGA", type="primary"):
+            with st.spinner(f"Coletando dados e aplicando Poisson para {LIGAS[liga_unica]}..."):
+                df_liga = processar_jogos_da_liga(liga_unica, data_unica, HEADERS)
+                
+                if df_liga.empty:
+                    st.info(f"Nenhum confronto ativo localizado para {LIGAS[liga_unica]} na janela desta data. Tente selecionar outra data da rodada.")
+                else:
