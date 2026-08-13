@@ -61,7 +61,7 @@ LIGAS = {
     # Índia
     323: "ÍNDIA: Indian Super League (ISL)", 324: "ÍNDIA: I-League",
     # Arábia Saudita
-    307: "ARÁBIA SAUDITA: Saudi Pro League", 308: "ARÁBIA Saudita: Yelo League (1st Div)"
+    307: "ARÁBIA SAUDITA: Saudi Pro League", 308: "ARÁBIA SAUDITA: Yelo League (1st Div)"
 }
 
 HEADERS = {
@@ -136,48 +136,50 @@ def processar_jogos_da_liga(liga_id, data_escolhida, headers):
     
     for data_atual in datas_teste:
         data_formatada = data_atual.strftime("%Y-%m-%d")
-        season_temp = data_atual.year
+        ano_atual = data_atual.year
         
-        try:
-            url = "https://api-sports.io"
-            params = {'league': liga_id, 'season': season_temp, 'date': data_formatada}
-            r = requests.get(url, headers=headers, params=params)
-            
-            if r.status_code == 200:
-                fixtures = r.json().get('response', [])
-                if len(fixtures) > 0:
-                    for f in fixtures:
-                        id_c, id_f = f['teams']['home']['id'], f['teams']['away']['id']
-                        nome_c, name_f = f['teams']['home']['name'], f['teams']['away']['name']
-                        dt_str = f['fixture']['date']
-                        hora_formatada = dt_str[11:16] if len(dt_str) > 16 else "00:00"
-                        
-                        s_c = obter_estatisticas_time_filtrado(liga_id, season_temp, id_c, headers)
-                        s_f = obter_estatisticas_time_filtrado(liga_id, season_temp, id_f, headers)
-                        
-                        calc = calcular_probabilidades_poisson(s_c, s_f)
-                        conf_nome = f"{nome_c} x {name_f}"
-                        
-                        cursor.execute('INSERT OR REPLACE INTO historico_partidas VALUES (?, ?, ?, ?, ?)', 
-                                       (conf_nome, calc['odd_ht'], calc['odd_15'], calc['odd_25'], calc['odd_bt']))
-                        st.session_state.db_conn.commit()
-                        
-                        jogos.append({
-                            "Data": data_atual.strftime("%d/%m"),
-                            "Liga": LIGAS[liga_id],
-                            "Confronto": conf_nome,
-                            "Hora": hora_formatada,
-                            "0.5 HT (%)": calc['p_ht'], "Odd HT": calc['odd_ht'],
-                            "1.5 FT (%)": calc['p_over_15'], "Odd 1.5FT": calc['odd_15'],
-                            "2.5 FT (%)": calc['p_over_25'], "Odd 2.5FT": calc['odd_25'],
-                            "BTTS (%)": calc['p_btts'], "Odd BTTS": calc['odd_bt'],
-                            "Over 8.5 Cantos (%)": calc['p_cantos_85'],
-                            "Over 4.5 Cartões (%)": calc['p_cartoes_45']
-                        })
-                    return pd.DataFrame(jogos)
-        except:
-            pass
-            
+        # Estrutura de temporadas corrigida com indentação perfeita de 4 espaços
+        for season_temp in [ano_atual, ano_atual - 1]:
+            try:
+                url = "https://api-sports.io"
+                params = {'league': liga_id, 'season': season_temp, 'date': data_formatada}
+                r = requests.get(url, headers=headers, params=params)
+                
+                if r.status_code == 200:
+                    fixtures = r.json().get('response', [])
+                    if len(fixtures) > 0:
+                        for f in fixtures:
+                            id_c, id_f = f['teams']['home']['id'], f['teams']['away']['id']
+                            nome_c, name_f = f['teams']['home']['name'], f['teams']['away']['name']
+                            dt_str = f['fixture']['date']
+                            hora_formatada = dt_str[11:16] if len(dt_str) > 16 else "00:00"
+                            
+                            s_c = obter_estatisticas_time_filtrado(liga_id, season_temp, id_c, headers)
+                            s_f = obter_estatisticas_time_filtrado(liga_id, season_temp, id_f, headers)
+                            
+                            calc = calcular_probabilidades_poisson(s_c, s_f)
+                            conf_nome = f"{nome_c} x {name_f}"
+                            
+                            cursor.execute('INSERT OR REPLACE INTO historico_partidas VALUES (?, ?, ?, ?, ?)', 
+                                           (conf_nome, calc['odd_ht'], calc['odd_15'], calc['odd_25'], calc['odd_bt']))
+                            st.session_state.db_conn.commit()
+                            
+                            jogos.append({
+                                "Data": data_atual.strftime("%d/%m"),
+                                "Liga": LIGAS[liga_id],
+                                "Confronto": conf_nome,
+                                "Hora": hora_formatada,
+                                "0.5 HT (%)": calc['p_ht'], "Odd HT": calc['odd_ht'],
+                                "1.5 FT (%)": calc['p_over_15'], "Odd 1.5FT": calc['odd_15'],
+                                "2.5 FT (%)": calc['p_over_25'], "Odd 2.5FT": calc['odd_25'],
+                                "BTTS (%)": calc['p_btts'], "Odd BTTS": calc['odd_bt'],
+                                "Over 8.5 Cantos (%)": calc['p_cantos_85'],
+                                "Over 4.5 Cartões (%)": calc['p_cartoes_45']
+                            })
+                        return pd.DataFrame(jogos)
+            except:
+                pass
+                
     return pd.DataFrame(jogos)
 
 # --- CORPO DA INTERFACE VISUAL ---
@@ -211,8 +213,3 @@ else:
                 
                 if df_liga.empty:
                     st.info(f"Nenhum confronto ativo localizado para {LIGAS[liga_unica]} na janela desta data. Tente selecionar outra data da rodada.")
-                else:
-                    st.success(f"Sucesso! {len(df_liga)} partidas localizadas na janela da rodada.")
-                    st.dataframe(df_liga, use_container_width=True)
-                    
-                    st.markdown("### 🔥 Insights Rápidos da Rodada")
