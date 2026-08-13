@@ -54,7 +54,7 @@ LIGAS = {
     323: "ÍNDIA: Indian Super League (ISL)", 324: "ÍNDIA: I-League",
     # Arábia Saudita
     307: "ARÁBIA SAUDITA: Saudi Pro League", 308: "ARÁBIA SAUDITA: Yelo League (1st Div)",
-    # Holanda (IDs Validados)
+    # Holanda
     88: "HOLANDA: Eredivisie (1ª Divisão)", 
     89: "HOLANDA: Eerste Divisie (2ª Divisão)",
     # Finlândia
@@ -131,8 +131,10 @@ def processar_jogos_da_liga(liga_id, data_escolhida, headers):
     ano_atual = data_escolhida.year
     cursor = st.session_state.db_conn.cursor()
     
-    # Busca inteligente: Tenta o ano selecionado e recua até 2 anos para cobrir cruzamento de calendários europeus
-    for season_temp in [ano_atual, ano_atual - 1, ano_atual - 2]:
+    # Fallback de Varredura Expandido para cobrir calendários europeus cruzados
+    temporadas_busca = [ano_atual, ano_atual - 1, ano_atual - 2]
+    
+    for season_temp in temporadas_busca:
         try:
             url = "https://api-sports.io"
             params = {'league': liga_id, 'season': season_temp, 'date': data_formatada, 'timezone': 'America/Sao_Paulo'}
@@ -205,7 +207,6 @@ else:
                 df_liga = processar_jogos_da_liga(liga_unica, data_unica, HEADERS)
                 
                 if df_liga.empty:
-                    st.info(f"Sem partidas ativas localizadas para {LIGAS[liga_unica]} nesta data. Dica: Se os times forem da primeira divisão da Holanda, selecione 'HOLANDA: Eredivisie' no menu.")
+                    st.info(f"Sem partidas ativas localizadas para {LIGAS[liga_unica]} nesta data. Nota: Verifique se os confrontos pertencem à Eredivisie (1ª Divisão) ou se a rodada ocorre em outra data próxima.")
                 else:
                     st.success(f"Sucesso! {len(df_liga)} partidas encontradas.")
-                    st.dataframe(df_liga, use_container_width=True)
