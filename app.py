@@ -9,88 +9,61 @@ from scipy.stats import poisson
 # Configuração da página do Streamlit
 st.set_page_config(page_title="Analisador Premium asc.bet", layout="wide", page_icon="📊")
 
-# --- GERENCIAMENTO DE CHAVE DA API PRO CORRETA ---
+# --- GERENCIAMENTO DE CHAVE DA API PRO ---
 st.sidebar.title("Configurações de Acesso PRO")
 chave_padrao = st.secrets.get("API_KEY", "")
 API_FOOTBALL_KEY = st.sidebar.text_input("Sua Chave API-Football PRO:", value=chave_padrao, type="password")
 
-# DICIONÁRIO EXPANDIDO COM TODAS AS LIGAS SOLICITADAS (IDs OFICIAIS API-FOOTBALL PRO)
+# DICIONÁRIO EXPANDIDO COM TODAS AS LIGAS MAPEADAS
 LIGAS = {
     # Brasil
-    71: "BRASIL: Série A", 
-    72: "BRASIL: Série B", 
-    73: "BRASIL: Série C",
+    71: "BRASIL: Série A", 72: "BRASIL: Série B", 73: "BRASIL: Série C",
     # Croácia
-    210: "CROÁCIA: HNL", 
-    211: "CROÁCIA: Prva NL",
+    210: "CROÁCIA: HNL", 211: "CROÁCIA: Prva NL",
     # Austrália
     188: "AUSTRÁLIA: A-League Men",
     # Japão
-    196: "JAPÃO: J1 League", 
-    197: "JAPÃO: J2 League",
+    196: "JAPÃO: J1 League", 197: "JAPÃO: J2 League",
     # China
-    169: "CHINA: Superliga Chinesa (CSL)", 
-    170: "CHINA: China League One",
+    169: "CHINA: Superliga Chinesa (CSL)", 170: "CHINA: China League One",
     # Coreia do Sul
-    292: "COREIA DO SUL: K League 1", 
-    293: "COREIA DO SUL: K League 2",
+    292: "COREIA DO SUL: K League 1", 293: "COREIA DO SUL: K League 2",
     # Hungria
-    271: "HUNGRIA: NB I", 
-    272: "HUNGRIA: NB II",
+    271: "HUNGRIA: NB I", 272: "HUNGRIA: NB II",
     # Suíça
     207: "SUÍÇA: Swiss Super League",
     # Turquia
-    203: "TURQUIA: Süper Lig", 
-    204: "TURQUIA: TFF 1. Lig",
+    203: "TURQUIA: Süper Lig", 204: "TURQUIA: TFF 1. Lig",
     # Grécia
     197: "GRÉCIA: Super League 1",
     # Israel
-    243: "ISRAEL: Ligat Ha'Al", 
-    244: "ISRAEL: Liga Leumit",
+    243: "ISRAEL: Ligat Ha'Al", 244: "ISRAEL: Liga Leumit",
     # Alemanha
-    78: "ALEMANHA: Bundesliga", 
-    79: "ALEMANHA: Bundesliga 2", 
-    80: "ALEMANHA: Bundesliga 3", 
-    81: "ALEMANHA: Regionalliga",
+    78: "ALEMANHA: Bundesliga", 79: "ALEMANHA: Bundesliga 2", 80: "ALEMANHA: Bundesliga 3", 81: "ALEMANHA: Regionalliga",
     # Inglaterra
-    39: "INGLATERRA: Premier League", 
-    40: "INGLATERRA: EFL Championship", 
-    41: "INGLATERRA: EFL League One", 
-    42: "INGLATERRA: EFL League Two",
+    39: "INGLATERRA: Premier League", 40: "INGLATERRA: EFL Championship", 41: "INGLATERRA: EFL League One", 42: "INGLATERRA: EFL League Two",
     # França
-    61: "FRANÇA: Ligue 1", 
-    62: "FRANÇA: Ligue 2",
+    61: "FRANÇA: Ligue 1", 62: "FRANÇA: Ligue 2",
     # Espanha
-    140: "ESPANHA: La Liga", 
-    141: "ESPANHA: La Liga 2",
+    140: "ESPANHA: La Liga", 141: "ESPANHA: La Liga 2",
     # Portugal
-    94: "PORTUGAL: Primeira Liga", 
-    95: "PORTUGAL: Segunda Liga",
+    94: "PORTUGAL: Primeira Liga", 95: "PORTUGAL: Segunda Liga",
     # Itália
-    135: "ITÁLIA: Serie A", 
-    136: "ITÁLIA: Serie B", 
-    137: "ITÁLIA: Serie C",
+    135: "ITÁLIA: Serie A", 136: "ITÁLIA: Serie B", 137: "ITÁLIA: Serie C",
     # Índia
-    323: "ÍNDIA: Indian Super League (ISL)", 
-    324: "ÍNDIA: I-League",
+    323: "ÍNDIA: Indian Super League (ISL)", 324: "ÍNDIA: I-League",
     # Arábia Saudita
-    307: "ARÁBIA SAUDITA: Saudi Pro League", 
-    308: "ARÁBIA SAUDITA: Yelo League (1st Div)",
+    307: "ARÁBIA SAUDITA: Saudi Pro League", 308: "ARÁBIA SAUDITA: Yelo League (1st Div)",
     # Holanda
-    88: "HOLANDA: Eredivisie",
-    89: "HOLANDA: Eerste Divisie",
+    88: "HOLANDA: Eredivisie", 89: "HOLANDA: Eerste Divisie",
     # Finlândia
-    247: "FINLÂNDIA: Veikkausliiga",
-    248: "FINLÂNDIA: Ykkönen",
+    247: "FINLÂNDIA: Veikkausliiga", 248: "FINLÂNDIA: Ykkönen",
     # Dinamarca
-    119: "DINAMARCA: Superliga",
-    120: "DINAMARCA: 1st Division",
+    119: "DINAMARCA: Superliga", 120: "DINAMARCA: 1st Division",
     # Islândia
-    352: "ISLÂNDIA: Besta deild karla",
-    353: "ISLÂNDIA: 1. deild"
+    352: "ISLÂNDIA: Besta deild karla", 353: "ISLÂNDIA: 1. deild"
 }
 
-# Cabeçalhos ajustados para o Servidor de Produção PRO Direto
 HEADERS = {
     'x-apisports-key': API_FOOTBALL_KEY
 }
@@ -112,16 +85,12 @@ def obter_estatisticas_time_filtrado(liga_id, season, team_id, _headers):
         if r.status_code == 200:
             res = r.json().get('response', {})
             gols = res.get('goals', {})
-            
             gols_m = float(gols.get('for', {}).get('average', {}).get('total', 1.3) or 1.3)
             gols_s = float(gols.get('against', {}).get('average', {}).get('total', 1.1) or 1.1)
-            
             cantos_media = res.get('corners', {}).get('average', {}).get('total', 5.0)
             cantos = float(cantos_media if cantos_media is not None else 5.0)
-            
             cartoes_media = res.get('cards', {}).get('yellow', {}).get('average', 2.0)
             cartoes = float(cartoes_media if cartoes_media is not None else 2.2)
-            
             return {'gols_m': gols_m, 'gols_s': gols_s, 'cantos': cantos, 'cartoes': cartoes}
     except:
         pass
@@ -238,3 +207,9 @@ else:
                 if df_liga.empty:
                     st.info(f"Sem partidas ativas localizadas para {LIGAS[liga_unica]} nesta data.")
                 else:
+                    st.success(f"Sucesso! {len(df_liga)} partidas encontradas.")
+                    st.dataframe(df_liga, use_container_width=True)
+                    
+                    st.markdown("### 🔥 Insights Rápidos da Rodada")
+                    col_ht, col_ft, col_btts = st.columns(3)
+                    
