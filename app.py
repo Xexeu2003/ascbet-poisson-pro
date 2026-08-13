@@ -101,8 +101,8 @@ def obter_estatisticas_time_filtrado(liga_id, season, team_id, _headers):
             res = r.json().get('response', {})
             gols = res.get('goals', {})
             
-            gols_m = float(gols.get('for', {}).get('average', {}).get('total', 1.3))
-            gols_s = float(gols.get('against', {}).get('average', {}).get('total', 1.1))
+            gols_m = float(gols.get('for', {}).get('average', {}).get('total', 1.3) or 1.3)
+            gols_s = float(gols.get('against', {}).get('average', {}).get('total', 1.1) or 1.1)
             
             cantos_media = res.get('corners', {}).get('average', {}).get('total', 5.0)
             cantos = float(cantos_media if cantos_media is not None else 5.0)
@@ -231,5 +231,5 @@ else:
                     st.markdown("### 🔥 Insights Rápidos da Rodada")
                     col_ht, col_ft, col_btts = st.columns(3)
                     
-                    # Lógica nativa e direta sem risco de IndentationError
                     df_ht = df_liga.sort_values(by="0.5 HT (%)", ascending=False)
+                    df_ft = df_liga.sort_values(by="2.5 FT (%)", ascending=False)
