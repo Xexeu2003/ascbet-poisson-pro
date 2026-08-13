@@ -14,7 +14,7 @@ st.sidebar.title("Configurações de Acesso PRO")
 chave_padrao = st.secrets.get("API_KEY", "")
 API_FOOTBALL_KEY = st.sidebar.text_input("Sua Chave API-Football PRO:", value=chave_padrao, type="password")
 
-# DICIONÁRIO ATUALIZADO DE LIGAS COM IDS OFICIAIS DE PRODUÇÃO
+# DICIONÁRIO TOTALMENTE REVISADO E CORRIGIDO DE ACORDO COM A DOCUMENTAÇÃO DA API
 LIGAS = {
     # Brasil
     71: "BRASIL: Série A", 72: "BRASIL: Série B", 73: "BRASIL: Série C",
@@ -55,10 +55,9 @@ LIGAS = {
     # Arábia Saudita
     307: "ARÁBIA SAUDITA: Saudi Pro League", 308: "ARÁBIA SAUDITA: Yelo League (1st Div)",
     # Holanda
-    88: "HOLANDA: Eredivisie (1ª Divisão)", 
-    89: "HOLANDA: Eerste Divisie (2ª Divisão)",
-    # Finlândia
-    247: "FINLÂNDIA: Veikkausliiga", 248: "FINLÂNDIA: Ykkönen",
+    88: "HOLANDA: Eredivisie (1ª Divisão)", 89: "HOLANDA: Eerste Divisie (2ª Divisão)",
+    # Finlândia (ID CORRIGIDO PARA O PADRÃO OFICIAL PRO 244)
+    244: "FINLÂNDIA: Veikkausliiga", 245: "FINLÂNDIA: Ykkönen",
     # Dinamarca
     119: "DINAMARCA: Superliga", 120: "DINAMARCA: 1st Division",
     # Islândia
@@ -131,10 +130,8 @@ def processar_jogos_da_liga(liga_id, data_escolhida, headers):
     ano_atual = data_escolhida.year
     cursor = st.session_state.db_conn.cursor()
     
-    # Fallback de Varredura Expandido para cobrir calendários europeus cruzados
-    temporadas_busca = [ano_atual, ano_atual - 1, ano_atual - 2]
-    
-    for season_temp in temporadas_busca:
+    # Para ligas com calendário anual cheio (Nórdicas), força a busca direta no ano do seletor
+    for season_temp in [ano_atual, ano_atual - 1]:
         try:
             url = "https://api-sports.io"
             params = {'league': liga_id, 'season': season_temp, 'date': data_formatada, 'timezone': 'America/Sao_Paulo'}
@@ -207,6 +204,8 @@ else:
                 df_liga = processar_jogos_da_liga(liga_unica, data_unica, HEADERS)
                 
                 if df_liga.empty:
-                    st.info(f"Sem partidas ativas localizadas para {LIGAS[liga_unica]} nesta data. Nota: Verifique se os confrontos pertencem à Eredivisie (1ª Divisão) ou se a rodada ocorre em outra data próxima.")
+                    st.info(f"Sem partidas ativas localizadas para {LIGAS[liga_unica]} nesta data. Nota: Verifique se a rodada ocorre em outra data próxima.")
                 else:
                     st.success(f"Sucesso! {len(df_liga)} partidas encontradas.")
+                    st.dataframe(df_liga, use_container_width=True)
+                    
