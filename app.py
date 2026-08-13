@@ -14,7 +14,7 @@ st.sidebar.title("Configurações de Acesso PRO")
 chave_padrao = st.secrets.get("API_KEY", "")
 API_FOOTBALL_KEY = st.sidebar.text_input("Sua Chave API-Football PRO:", value=chave_padrao, type="password")
 
-# DICIONÁRIO EXPANDIDO COM TODAS AS LIGAS SOLICITADAS
+# DICIONÁRIO EXPANDIDO COM TODAS AS LIGAS SOLICITADAS (IDs OFICIAIS API-FOOTBALL PRO)
 LIGAS = {
     # Brasil
     71: "BRASIL: Série A", 
@@ -75,7 +75,19 @@ LIGAS = {
     324: "ÍNDIA: I-League",
     # Arábia Saudita
     307: "ARÁBIA SAUDITA: Saudi Pro League", 
-    308: "ARÁBIA SAUDITA: Yelo League (1st Div)"
+    308: "ARÁBIA SAUDITA: Yelo League (1st Div)",
+    # Holanda
+    88: "HOLANDA: Eredivisie",
+    89: "HOLANDA: Eerste Divisie",
+    # Finlândia
+    247: "FINLÂNDIA: Veikkausliiga",
+    248: "FINLÂNDIA: Ykkönen",
+    # Dinamarca
+    119: "DINAMARCA: Superliga",
+    120: "DINAMARCA: 1st Division",
+    # Islândia
+    352: "ISLÂNDIA: Besta deild karla",
+    353: "ISLÂNDIA: 1. deild"
 }
 
 # Cabeçalhos ajustados para o Servidor de Produção PRO Direto
@@ -226,10 +238,3 @@ else:
                     st.info(f"Sem partidas ativas localizadas para {LIGAS[liga_unica]} nesta data.")
                 else:
                     st.success(f"Sucesso! {len(df_liga)} partidas encontradas.")
-                    st.dataframe(df_liga, use_container_width=True)
-                    
-                    st.markdown("### 🔥 Insights Rápidos da Rodada")
-                    col_ht, col_ft, col_btts = st.columns(3)
-                    
-                    df_ht = df_liga.sort_values(by="0.5 HT (%)", ascending=False)
-                    df_ft = df_liga.sort_values(by="2.5 FT (%)", ascending=False)
