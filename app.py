@@ -130,16 +130,17 @@ def processar_jogos_da_liga(liga_id, data_escolhida, headers):
     
     datas_teste = [
         data_escolhida,
-        data_escolhida - timedelta(days=1),
-        data_escolhida + timedelta(days=1)
+        data_escolhida + timedelta(days=1),
+        data_escolhida + timedelta(days=2),
+        data_escolhida + timedelta(days=3),
+        data_escolhida - timedelta(days=1)
     ]
     
     for data_atual in datas_teste:
         data_formatada = data_atual.strftime("%Y-%m-%d")
         ano_atual = data_atual.year
         
-        # Estrutura de temporadas corrigida com indentação perfeita de 4 espaços
-        for season_temp in [ano_atual, ano_atual - 1]:
+        for season_temp in [ano_atual, year_temp := (ano_atual - 1)]:
             try:
                 url = "https://api-sports.io"
                 params = {'league': liga_id, 'season': season_temp, 'date': data_formatada}
@@ -205,11 +206,10 @@ else:
                 format_func=lambda x: LIGAS[x]
             )
         with col2:
-            data_unica = st.date_input("Data dos Confrontos", datetime.now(), key="data_unica")
+            data_unica = st.date_input("Data de Referência", datetime.now(), key="data_unica")
             
         if st.button("📊 PROJETAR JOGOS DA LIGA", type="primary"):
             with st.spinner(f"Coletando dados e aplicando Poisson para {LIGAS[liga_unica]}..."):
                 df_liga = processar_jogos_da_liga(liga_unica, data_unica, HEADERS)
                 
                 if df_liga.empty:
-                    st.info(f"Nenhum confronto ativo localizado para {LIGAS[liga_unica]} na janela desta data. Tente selecionar outra data da rodada.")
