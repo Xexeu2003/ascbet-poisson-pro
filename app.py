@@ -14,7 +14,7 @@ st.sidebar.title("Configurações de Acesso PRO")
 chave_padrao = st.secrets.get("API_KEY", "")
 API_FOOTBALL_KEY = st.sidebar.text_input("Sua Chave API-Football PRO:", value=chave_padrao, type="password")
 
-# DICIONÁRIO EXPANDIDO COM TODAS AS LIGAS SOLICITADAS (IDs OFICIAIS API-FOOTBALL PRO)
+# DICIONÁRIO EXPANDIDO COM TODAS AS LIGAS SOLICITADAS
 LIGAS = {
     # Brasil
     71: "BRASIL: Série A", 
@@ -166,7 +166,9 @@ def processar_jogos_da_liga(liga_id, data_escolhida, headers):
     for season_temp in [ano_atual, ano_atual - 1]:
         try:
             url = "https://api-sports.io"
-            r = requests.get(url, headers=headers, params={'league': liga_id, 'season': season_temp, 'date': data_formatada})
+            # Injetado parâmetro 'timezone' para alinhar a busca ao horário de Brasília
+            params = {'league': liga_id, 'season': season_temp, 'date': data_formatada, 'timezone': 'America/Sao_Paulo'}
+            r = requests.get(url, headers=headers, params=params)
             
             if r.status_code == 200:
                 fixtures = r.json().get('response', [])
@@ -237,4 +239,3 @@ else:
                 if df_liga.empty:
                     st.info(f"Sem partidas ativas localizadas para {LIGAS[liga_unica]} nesta data.")
                 else:
-                    st.success(f"Sucesso! {len(df_liga)} partidas encontradas.")
