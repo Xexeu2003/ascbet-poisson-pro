@@ -140,7 +140,7 @@ def processar_jogos_da_liga(liga_id, data_escolhida, headers):
         data_formatada = data_atual.strftime("%Y-%m-%d")
         ano_atual = data_atual.year
         
-        for season_temp in [ano_atual, year_temp := (ano_atual - 1)]:
+        for season_temp in [ano_atual, ano_atual - 1]:
             try:
                 url = "https://api-sports.io"
                 params = {'league': liga_id, 'season': season_temp, 'date': data_formatada}
