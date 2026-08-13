@@ -232,4 +232,4 @@ else:
                     col_ht, col_ft, col_btts = st.columns(3)
                     
                     try:
-                        top_ht = df_liga.sort_values(by="0.5 HT (%)", ascending=False).iloc[0]
+                        # Toda a lógica de ordenação e fatiamento agora está protegida internamente
