@@ -231,5 +231,5 @@ else:
                     st.markdown("### 🔥 Insights Rápidos da Rodada")
                     col_ht, col_ft, col_btts = st.columns(3)
                     
-                    try:
-                        # Ordenação isolada e tratamento preventivo de amostragem vazia
+                    # Lógica nativa e direta sem risco de IndentationError
+                    df_ht = df_liga.sort_values(by="0.5 HT (%)", ascending=False)
