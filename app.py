@@ -212,4 +212,5 @@ else:
             with st.spinner(f"Coletando dados e aplicando Poisson para {LIGAS[liga_unica]}..."):
                 df_liga = processar_jogos_da_liga(liga_unica, data_unica, HEADERS)
                 
+                # REESTRUTURAÇÃO COMPLETA LINEAR: Sem ifs órfãos que quebram identação
                 if df_liga.empty:
