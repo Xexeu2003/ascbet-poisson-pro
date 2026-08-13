@@ -14,7 +14,7 @@ st.sidebar.title("Configurações de Acesso PRO")
 chave_padrao = st.secrets.get("API_KEY", "")
 API_FOOTBALL_KEY = st.sidebar.text_input("Sua Chave API-Football PRO:", value=chave_padrao, type="password")
 
-# DICIONÁRIO EXPANDIDO COM TODAS AS LIGAS MAPEADAS
+# DICIONÁRIO ATUALIZADO DE LIGAS COM IDS OFICIAIS DE PRODUÇÃO
 LIGAS = {
     # Brasil
     71: "BRASIL: Série A", 72: "BRASIL: Série B", 73: "BRASIL: Série C",
@@ -54,8 +54,9 @@ LIGAS = {
     323: "ÍNDIA: Indian Super League (ISL)", 324: "ÍNDIA: I-League",
     # Arábia Saudita
     307: "ARÁBIA SAUDITA: Saudi Pro League", 308: "ARÁBIA SAUDITA: Yelo League (1st Div)",
-    # Holanda
-    88: "HOLANDA: Eredivisie", 89: "HOLANDA: Eerste Divisie",
+    # Holanda (IDs Validados)
+    88: "HOLANDA: Eredivisie (1ª Divisão)", 
+    89: "HOLANDA: Eerste Divisie (2ª Divisão)",
     # Finlândia
     247: "FINLÂNDIA: Veikkausliiga", 248: "FINLÂNDIA: Ykkönen",
     # Dinamarca
@@ -68,7 +69,6 @@ HEADERS = {
     'x-apisports-key': API_FOOTBALL_KEY
 }
 
-# --- BANCO DE DADOS LOCAL ---
 if 'db_conn' not in st.session_state:
     st.session_state.db_conn = sqlite3.connect('asc_bet_dados_v2.db', check_same_thread=False)
     cursor = st.session_state.db_conn.cursor()
@@ -76,7 +76,6 @@ if 'db_conn' not in st.session_state:
                       (confronto TEXT PRIMARY KEY, odd_ht REAL, odd_15ft REAL, odd_25ft REAL, odd_btts REAL)''')
     st.session_state.db_conn.commit()
 
-# --- FUNÇÕES DE CÁLCULO E INTEGRAL DE POISSON ---
 @st.cache_data(ttl=86400)
 def obter_estatisticas_time_filtrado(liga_id, season, team_id, _headers):
     try:
@@ -132,7 +131,8 @@ def processar_jogos_da_liga(liga_id, data_escolhida, headers):
     ano_atual = data_escolhida.year
     cursor = st.session_state.db_conn.cursor()
     
-    for season_temp in [ano_atual, ano_atual - 1]:
+    # Busca inteligente: Tenta o ano selecionado e recua até 2 anos para cobrir cruzamento de calendários europeus
+    for season_temp in [ano_atual, ano_atual - 1, ano_atual - 2]:
         try:
             url = "https://api-sports.io"
             params = {'league': liga_id, 'season': season_temp, 'date': data_formatada, 'timezone': 'America/Sao_Paulo'}
@@ -205,11 +205,7 @@ else:
                 df_liga = processar_jogos_da_liga(liga_unica, data_unica, HEADERS)
                 
                 if df_liga.empty:
-                    st.info(f"Sem partidas ativas localizadas para {LIGAS[liga_unica]} nesta data.")
+                    st.info(f"Sem partidas ativas localizadas para {LIGAS[liga_unica]} nesta data. Dica: Se os times forem da primeira divisão da Holanda, selecione 'HOLANDA: Eredivisie' no menu.")
                 else:
                     st.success(f"Sucesso! {len(df_liga)} partidas encontradas.")
                     st.dataframe(df_liga, use_container_width=True)
-                    
-                    st.markdown("### 🔥 Insights Rápidos da Rodada")
-                    col_ht, col_ft, col_btts = st.columns(3)
-                    
