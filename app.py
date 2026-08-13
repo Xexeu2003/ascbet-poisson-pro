@@ -1,89 +1,188 @@
 import streamlit as st
 import requests
-import pandas as pd
 import math
-from datetime import datetime, timedelta
+import pandas as pd
 from fpdf import FPDF
-import os
+import io
 
-st.set_page_config(page_title="Football Match Analyzer", layout="wide")
+BASE_URL = 'https://v3.football.api-sports.io'
 
-API_KEY = st.secrets.get("API_FOOTBALL_KEY", os.getenv("API_FOOTBALL_KEY"))
-BASE_URL = "https://v3.football.api-sports.io"
-HEADERS = {"x-apisports-key": API_KEY} if API_KEY else {}
-
-@st.cache_data(ttl=3600)
-def api_get(endpoint, params=None):
-    if not API_KEY:
-        st.error("API key not configured. Set API_FOOTBALL_KEY in secrets.")
-        st.stop()
+# Função para obter cabeçalhos da API com chave segura
+def get_headers():
     try:
-        r = requests.get(f"{BASE_URL}/{endpoint}", headers=HEADERS, params=params, timeout=15)
-        r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        st.error(f"API error: {e}")
+        key = st.secrets['API_FOOTBALL_KEY']
+        return {'x-apisports-key': key}
+    except:
+        st.error('Chave API_FOOTBALL_KEY não encontrada em secrets.')
         return None
 
-def poisson_pmf(k, lamb):
-    if lamb <= 0:
+# Função pequena para chamadas com timeout e tratamento de erros
+def api_call(endpoint, params):
+    headers = get_headers()
+    if not headers:
+        return None
+    try:
+        resp = requests.get(f'{BASE_URL}{endpoint}', headers=headers, params=params, timeout=10)
+        if resp.status_code == 401:
+            st.error('Erro 401: Chave inválida.')
+            return None
+        if resp.status_code == 403:
+            st.error('Erro 403: Acesso negado.')
+            return None
+        if resp.status_code == 429:
+            st.error('Erro 429: Limite de requisições excedido.')
+            return None
+        if resp.status_code != 200:
+            st.error(f'Erro API: {resp.status_code}')
+            return None
+        return resp.json()
+    except Exception as e:
+        st.error(f'Erro de conexão: {str(e)}')
+        return None
+
+# Função para Poisson PMF
+def poisson_pmf(k, lam):
+    if lam <= 0:
         return 0.0
-    return (math.exp(-lamb) * lamb ** k) / math.factorial(k)
+    return (lam ** k * math.exp(-lam)) / math.factorial(k)
 
-def calc_probs(home_avg, away_avg):
-    p = {}
-    # Over 0.5 HT (simplified using 0.55*FT avg)
-    ht_home = home_avg * 0.55
-    ht_away = away_avg * 0.55
-    p["over_0.5_ht"] = 1 - sum(poisson_pmf(i, ht_home) * poisson_pmf(j, ht_away) for i in range(1) for j in range(1))
-    # Over 1.5 FT
-    p["over_1.5_ft"] = 1 - sum(poisson_pmf(i, home_avg) * poisson_pmf(j, away_avg) for i in range(2) for j in range(2))
-    # BTTS
-    p["btts"] = sum(poisson_pmf(i, home_avg) * poisson_pmf(j, away_avg) for i in range(1, 6) for j in range(1, 6))
-    return p
+# Função para calcular médias reais dos últimos 10 jogos
+@st.cache_data(ttl=3600)
+def get_team_averages(team_id, season):
+    data = api_call('/fixtures', {'team': team_id, 'last': 10, 'status': 'FT', 'season': season})
+    if not data or not data.get('response'):
+        return None
+    goals_for = []
+    goals_against = []
+    for f in data['response']:
+        if f['teams']['home']['id'] == team_id:
+            goals_for.append(f['goals']['home'] or 0)
+            goals_against.append(f['goals']['away'] or 0)
+        else:
+            goals_for.append(f['goals']['away'] or 0)
+            goals_against.append(f['goals']['home'] or 0)
+    if not goals_for:
+        return None
+    return {'avg_goals_for': sum(goals_for)/len(goals_for), 'avg_goals_against': sum(goals_against)/len(goals_against)}
 
-leagues = {39: "Premier League", 140: "La Liga", 78: "Bundesliga", 135: "Serie A", 61: "Ligue 1"}
-current_year = datetime.now().year
-seasons = list(range(2020, current_year + 2))
+# Função para obter fixture por ID
+@st.cache_data(ttl=3600)
+def get_fixture(fixture_id):
+    data = api_call('/fixtures', {'id': fixture_id})
+    return data['response'][0] if data and data.get('response') else None
 
-st.title("Football Match Analyzer (API-Football v3 + Poisson)")
+# Função para H2H com IDs
+@st.cache_data(ttl=3600)
+def get_h2h(home_id, away_id):
+    h2h_str = f'{home_id}-{away_id}'
+    data = api_call('/fixtures/headtohead', {'h2h': h2h_str, 'last': 10})
+    return data['response'] if data else []
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    league_id = st.selectbox("League", list(leagues.keys()), format_func=lambda x: leagues[x])
-with col2:
-    season = st.selectbox("Season", seasons, index=len(seasons)-2)
-with col3:
-    date_range = st.date_input("Date range", [datetime.now() - timedelta(days=30), datetime.now()])
+# Função para stats da temporada (fallback)
+@st.cache_data(ttl=3600)
+def get_team_stats(team_id, league_id, season):
+    data = api_call('/teams/statistics', {'team': team_id, 'league': league_id, 'season': season})
+    if data and data.get('response'):
+        return data['response']
+    return None
 
-if st.button("Load Fixtures"):
-    fixtures = api_get("fixtures", {"league": league_id, "season": season, "from": str(date_range[0]), "to": str(date_range[1])})
-    if fixtures and fixtures.get("response"):
-        df = pd.DataFrame([{"id": f["fixture"]["id"], "home": f["teams"]["home"]["name"], "away": f["teams"]["away"]["name"], "date": f["fixture"]["date"]} for f in fixtures["response"]])
-        st.dataframe(df)
-        selected = st.selectbox("Select fixture ID", df["id"].tolist())
-        if selected:
-            h2h = api_get("fixtures/headtohead", {"h2h": f"{df[df.id==selected].home.iloc[0]}-{df[df.id==selected].away.iloc[0]}", "season": season})
-            last10 = api_get("fixtures", {"team": df[df.id==selected].home.iloc[0], "last": 10})
-            stats = api_get("teams/statistics", {"league": league_id, "season": season, "team": df[df.id==selected].home.iloc[0]})
-            st.subheader("Last 10 & H2H")
-            st.json({"h2h": h2h, "last10": last10, "stats": stats})
-            home_avg = 1.5  # placeholder from stats
-            away_avg = 1.2
-            probs = calc_probs(home_avg, away_avg)
-            st.write("Poisson Probabilities:", probs)
-            line = st.slider("Corners line", 8, 14, 10)
-            st.write(f"Corners > {line} probability placeholder")
-            if st.button("Export CSV"):
-                df.to_csv("matches.csv", index=False)
-                st.success("CSV saved")
-            if st.button("Export PDF"):
+# Ligas permitidas
+ligas = {
+    'Finlândia Veikkausliiga': 244,
+    'Islândia Besta deild': 166,
+    'Alemanha 3. Liga': 80,
+    'Eredivisie': 88,
+    'Eerste Divisie': 89,
+    '1. Bundesliga': 78,
+    '2. Bundesliga': 79,
+    'Bélgica Jupiler Pro League': 144,
+    'Challenger Pro League': 145,
+    'Dinamarca Superligaen': 119,
+    '1. Division': 120,
+    'Polônia Ekstraklasa': 106,
+    'I Liga': 107,
+    'Hungria NB I': 271,
+    'NB II': 272,
+    'Austrália A-League Men': 188,
+    'Argentina Liga Profesional': 128,
+    'Primera Nacional': 129
+}
+
+st.title('Football Analyzer - Poisson')
+st.warning('Cálculo é estimativo e não é garantia de aposta. Use por sua conta e risco.')
+
+# Seletor de liga
+liga_nome = st.selectbox('Selecione uma liga', list(ligas.keys()))
+league_id = ligas[liga_nome]
+
+# Campo opcional para ID customizado (Regionalliga/Oberliga)
+st.info('IDs de Regionalliga e Oberliga devem ser confirmados via /leagues. Use campo abaixo se necessário.')
+custom_id = st.text_input('ID de liga personalizado (opcional)', '')
+if custom_id.strip().isdigit():
+    league_id = int(custom_id.strip())
+
+season = st.selectbox('Temporada', [2023, 2024, 2025, 2026])
+from_date = st.date_input('Data inicial')
+to_date = st.date_input('Data final')
+
+if st.button('Buscar fixtures'):
+    fixtures_data = api_call('/fixtures', {'league': league_id, 'season': season, 'from': str(from_date), 'to': str(to_date)})
+    if fixtures_data and fixtures_data.get('response'):
+        st.session_state['fixtures'] = fixtures_data['response']
+    else:
+        st.session_state['fixtures'] = []
+
+fixtures = st.session_state.get('fixtures', [])
+if fixtures:
+    fixture_options = {f"{f['fixture']['id']} - {f['teams']['home']['name']} vs {f['teams']['away']['name']}": f['fixture']['id'] for f in fixtures}
+    selected = st.selectbox('Selecione fixture', list(fixture_options.keys()))
+    fixture_id = fixture_options[selected]
+    
+    if st.button('Analisar'):
+        fixture = get_fixture(fixture_id)
+        if not fixture:
+            st.error('Fixture não encontrada.')
+        else:
+            home_id = fixture['teams']['home']['id']
+            away_id = fixture['teams']['away']['id']
+            
+            home_avgs = get_team_averages(home_id, season) or get_team_stats(home_id, league_id, season)
+            away_avgs = get_team_averages(away_id, season) or get_team_stats(away_id, league_id, season)
+            
+            if home_avgs and away_avgs:
+                # Cálculo Poisson simplificado para Over 0.5 HT, Over 1.5 FT, BTTS
+                lam_home = home_avgs.get('avg_goals_for', 1.3) if isinstance(home_avgs, dict) else 1.3
+                lam_away = away_avgs.get('avg_goals_against', 1.2) if isinstance(away_avgs, dict) else 1.2
+                
+                # Probabilidades
+                probs = []
+                for line in [0.5, 1.5, 2.5]:
+                    p_over = sum(poisson_pmf(k, lam_home + lam_away) for k in range(int(line)+1, 10))
+                    probs.append({'Linha': f'Over {line}', 'Probabilidade %': round(p_over*100, 1)})
+                
+                df = pd.DataFrame(probs)
+                st.dataframe(df)
+                
+                # Filtro 75%
+                high = df[df['Probabilidade %'] >= 75]
+                if not high.empty:
+                    st.write('Linhas com >=75%:', high)
+                
+                # CSV
+                csv = df.to_csv(index=False)
+                st.download_button('Baixar CSV', csv, 'probs.csv')
+                
+                # PDF
                 pdf = FPDF()
                 pdf.add_page()
-                pdf.cell(0,10,"Match Analysis")
-                pdf.output("report.pdf")
-                st.success("PDF saved")
+                pdf.set_font('Arial', size=12)
+                for _, row in df.iterrows():
+                    pdf.cell(0, 10, f"{row['Linha']}: {row['Probabilidade %']}%", ln=True)
+                pdf_bytes = pdf.output(dest='S').encode('latin-1', errors='replace')
+                st.download_button('Baixar PDF', pdf_bytes, 'report.pdf')
+            else:
+                st.warning('Dados insuficientes para cantos/cartões/HT.')
     else:
-        st.warning("No fixtures found.")
-
-st.caption("Secure key loading • Cached requests • Error handling enabled")
+        st.info('Clique em Analisar para processar.')
+else:
+    st.info('Busque fixtures primeiro.')
