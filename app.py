@@ -232,4 +232,4 @@ else:
                     col_ht, col_ft, col_btts = st.columns(3)
                     
                     try:
-                        # Toda a lógica de ordenação e fatiamento agora está protegida internamente
+                        # Ordenação isolada e tratamento preventivo de amostragem vazia
